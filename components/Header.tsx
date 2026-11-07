@@ -40,7 +40,7 @@ export default function Header({
           </div>
 
           <span className="mx-auto md:mx-0 font-medium truncate">
-            COMPLIMENTARY NATIONWIDE EXPRESS OVER ₦250
+            COMPLIMENTARY NATIONWIDE EXPRESS OVER ₦250,000
           </span>
 
           <div className="hidden md:flex items-center gap-3">
