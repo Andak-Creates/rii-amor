@@ -1,26 +1,59 @@
 @import "tailwindcss";
 
+@theme {
+  --font-serif: var(--font-cormorant), "Cormorant Garamond", "Didot", "Bodoni MT", serif;
+  --font-sans: var(--font-montserrat), "Montserrat", -apple-system, BlinkMacSystemFont, sans-serif;
+  
+  --color-sand-50: #FAF7F2;
+  --color-sand-100: #F4EFEA;
+  --color-sand-200: #EAE2D7;
+  --color-sand-300: #DDD2C4;
+  --color-sand-400: #C5B5A1;
+  --color-sand-700: #5C4D3C;
+  --color-sand-900: #1E1B18;
+  
+  --color-leopard-gold: #C99742;
+  --color-leopard-amber: #B26A28;
+  --color-leopard-dark: #2B1810;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #F4EFEA;
+  --foreground: #1E1B18;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #F4EFEA;
+  color: #1E1B18;
+  font-family: var(--font-montserrat), sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.font-serif-luxury {
+  font-family: var(--font-cormorant), Georgia, serif;
+}
+
+.font-sans-luxury {
+  font-family: var(--font-montserrat), sans-serif;
+}
+
+/* Custom delicate luxury scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #F4EFEA;
+}
+::-webkit-scrollbar-thumb {
+  background: #D9CEBF;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #B8A894;
 }

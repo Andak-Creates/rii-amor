@@ -1,0 +1,173 @@
+[
+  {
+    "id": "python-blouse",
+    "numberLabel": "1. PYTHON PRINT BLOUSE",
+    "name": "Python Print Blouse",
+    "subtitle": "Heritage Animalier Collection",
+    "price": 139000,
+    "category": "tops",
+    "theme": "Modern Muse",
+    "image": "https://images.unsplash.com/photo-1502716119720-b23a93e5fe1b?auto=format&fit=crop&w=900&q=85",
+    "secondaryImage": "https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?auto=format&fit=crop&w=900&q=85",
+    "description": "Crafted from fluid Italian silk habotai, this blouse features a hand-placed python scale print with soft neutral undertones, tailored french cuffs, and concealed mother-of-pearl buttons.",
+    "details": [
+      "100% Italian Silk Habotai",
+      "Relaxed tailored silhouette with elongated cuffs",
+      "Hand-finished French seams & curved hem",
+      "Dry clean only. Made in Florence, Italy"
+    ],
+    "composition": "100% Habotai Silk • Mother of Pearl fastenings",
+    "sizes": ["XS", "S", "M", "L", "XL"],
+    "inStock": true,
+    "isHeroFeatured": true
+  },
+  {
+    "id": "cheetah-coat",
+    "numberLabel": "2. CHEETAH COAT",
+    "name": "Cheetah Wool Overcoat",
+    "subtitle": "Tuscan Outerwear Edition",
+    "price": 219000,
+    "category": "outerwear",
+    "theme": "City Safari",
+    "image": "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=900&q=85",
+    "secondaryImage": "https://images.unsplash.com/photo-1485230895905-ec40ba36b9bc?auto=format&fit=crop&w=900&q=85",
+    "description": "An iconic statement piece crafted from double-faced virgin wool blend. Features a structured peak lapel, sharp tailored shoulders, and a custom jacquard cheetah motif inspired by vintage Italian safari archives.",
+    "details": [
+      "Virgin Wool & Cashmere blend",
+      "Structured shoulder pads & tailored back vent",
+      "Signature silk-blend cupro lining in warm sand",
+      "Horn button closures with hand-stitched reinforcements"
+    ],
+    "composition": "75% Virgin Wool, 20% Polyamide, 5% Cashmere",
+    "sizes": ["XS", "S", "M", "L"],
+    "inStock": true,
+    "isHeroFeatured": true
+  },
+  {
+    "id": "florence-gown",
+    "numberLabel": "3. LEOPARD EVENING GOWN",
+    "name": "Firenze Sunset Leopard Gown",
+    "subtitle": "Lookbook No. 4 Featured Piece",
+    "price": 289000,
+    "category": "dresses",
+    "theme": "Modern Muse",
+    "image": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=900&q=85",
+    "secondaryImage": "https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=900&q=85",
+    "description": "A dramatic floor-length slip silhouette cut on the bias in heavy silk satin. Highlights an open back with delicate criss-cross rouleau straps and subtle leopard rosettes designed to flatter movement.",
+    "details": [
+      "Heavyweight 22-momme Silk Charmeuse",
+      "Bias-cut architecture for natural drape",
+      "Dramatic low cowl back with micro-ties",
+      "Concealed side zip with hook-and-eye closure"
+    ],
+    "composition": "100% Mulberry Silk Charmeuse",
+    "sizes": ["XS", "S", "M", "L"],
+    "inStock": true,
+    "isHeroFeatured": true
+  },
+  {
+    "id": "python-bag",
+    "numberLabel": "4. HERITAGE PYTHON BAG",
+    "name": "Embossed Python Flap Bag",
+    "subtitle": "Artisan Leather Goods",
+    "price": 195000,
+    "category": "accessories",
+    "theme": "Timeless Textures",
+    "image": "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=900&q=85",
+    "secondaryImage": "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=900&q=85",
+    "description": "Handcrafted in the Santa Croce leather district of Florence. Features meticulously embossed python grain on vegetable-tanned calfskin with brushed antique gold hardware and detachable chain strap.",
+    "details": [
+      "Full-grain embossed calfskin",
+      "Brushed brass turn-lock clasp",
+      "Suede-lined dual internal compartments",
+      "Dimensions: 26cm W x 17cm H x 8cm D"
+    ],
+    "composition": "100% Calf Leather • Brass hardware",
+    "sizes": ["One Size"],
+    "inStock": true
+  },
+  {
+    "id": "savannah-trousers",
+    "numberLabel": "5. SAVANNAH PLEATED TROUSER",
+    "name": "Savannah High-Waist Trousers",
+    "subtitle": "City Safari Tailoring",
+    "price": 155000,
+    "category": "outerwear",
+    "theme": "City Safari",
+    "image": "https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?auto=format&fit=crop&w=900&q=85",
+    "secondaryImage": "https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=900&q=85",
+    "description": "Deeply pleated high-rise trousers tailored from lightweight tropical wool in sand-taupe, subtle cheetah waistband piping, and a flowing wide-leg hemline.",
+    "details": [
+      "Lightweight Italian Wool Gabardine",
+      "Double inverted pleats with sharp creases",
+      "Slanted side pockets & rear jetted pockets",
+      "Hand-finished hem for tailoring flexibility"
+    ],
+    "composition": "98% Virgin Wool, 2% Elastane",
+    "sizes": ["XS", "S", "M", "L", "XL"],
+    "inStock": true
+  },
+  {
+    "id": "essentials-stiletto",
+    "numberLabel": "6. CURATED ESSENTIALS STILETTO",
+    "name": "Firenze 90mm Leopard Pump",
+    "subtitle": "Editor's Essentials",
+    "price": 110000,
+    "category": "footwear",
+    "theme": "Timeless Textures",
+    "image": "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?auto=format&fit=crop&w=900&q=85",
+    "secondaryImage": "https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&w=900&q=85",
+    "description": "An ultra-sharp pointed stiletto in genuine printed pony hair with cushioned leather footbed and iconic 90mm architectural heel.",
+    "details": [
+      "Printed calf hair upper with leather sole",
+      "Padded kidskin memory foam insole",
+      "90mm / 3.5 inch lacquered stiletto heel",
+      "Handmade in Tuscany"
+    ],
+    "composition": "100% Calf Hair Upper • 100% Leather Sole",
+    "sizes": ["36", "37", "38", "39", "40", "41"],
+    "inStock": true
+  },
+  {
+    "id": "leopard-silk-scarf",
+    "numberLabel": "7. SIENA JACQUARD SILK SCARF",
+    "name": "Siena Animalier Silk Carré",
+    "subtitle": "Heritage Accessories",
+    "price": 85000,
+    "category": "accessories",
+    "theme": "Timeless Textures",
+    "image": "https://images.unsplash.com/photo-1601924994987-69e26d50dc26?auto=format&fit=crop&w=900&q=85",
+    "secondaryImage": "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=900&q=85",
+    "description": "A 90x90cm pure twill silk scarf showcasing the Rii Amor heraldic cheetah crest with hand-rolled French edges.",
+    "details": [
+      "100% Twill Mulberry Silk 16-momme",
+      "Hand-rolled and hand-stitched borders",
+      "Dimensions: 90 cm x 90 cm",
+      "Delivered in signature embossed archival box"
+    ],
+    "composition": "100% Silk Twill",
+    "sizes": ["One Size"],
+    "inStock": true
+  },
+  {
+    "id": "corset-midi-dress",
+    "numberLabel": "8. TUSCAN LEOPARD CORSET DRESS",
+    "name": "Tuscan Leopard Corset Midi",
+    "subtitle": "Modern Muse Collection",
+    "price": 245000,
+    "category": "dresses",
+    "theme": "Modern Muse",
+    "image": "https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?auto=format&fit=crop&w=900&q=85",
+    "secondaryImage": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=900&q=85",
+    "description": "Sculpted with internal flexible boning and sweetheart neckline, this midi dress drapes in featherlight silk georgette with warm amber rosettes.",
+    "details": [
+      "Structured boned bodice with stretch silk georgette",
+      "Midi length with flared godet hem",
+      "Back zip closure with delicate hook and eye",
+      "Fully lined in breathable silk habotai"
+    ],
+    "composition": "94% Silk, 6% Elastane",
+    "sizes": ["XS", "S", "M", "L"],
+    "inStock": true
+  }
+]
