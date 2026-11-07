@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Image from "next/image";
-import { X, ArrowRight, ArrowLeft, Sparkles, MapPin, ShoppingBag } from "lucide-react";
+import { X, ArrowRight, ArrowLeft, MapPin } from "lucide-react";
 import { Product } from "@/data/products";
 import { formatNaira } from "@/lib/currency";
 
@@ -155,7 +155,7 @@ export default function LookbookModal({
               </h3>
 
               <p className="font-serif italic text-sm text-[#5C4D3C] mt-4 pl-4 border-l-2 border-[#C99742] leading-relaxed">
-                "{currentLook.quote}"
+                &ldquo;{currentLook.quote}&rdquo;
               </p>
 
               <div className="mt-6 text-xs text-[#736555] space-y-2">

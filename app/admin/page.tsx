@@ -8,20 +8,14 @@ import {
   Plus,
   Trash2,
   Edit,
-  Eye,
   Check,
   ArrowLeft,
   RefreshCw,
   UploadCloud,
   CheckCircle2,
   AlertCircle,
-  HelpCircle,
   ShoppingBag,
-  ExternalLink,
-  Archive,
-  RotateCcw,
   Camera,
-  Image as ImageIcon,
 } from "lucide-react";
 import { Product } from "@/data/products";
 import {
@@ -31,7 +25,13 @@ import {
 } from "@/lib/currency";
 
 // High-end curated presets
-const CURATED_IMAGE_PRESETS = [
+const CURATED_IMAGE_PRESETS: {
+  name: string;
+  url: string;
+  theme: "Modern Muse" | "City Safari" | "Timeless Textures";
+  composition: string;
+  category: "outerwear" | "tops" | "dresses" | "accessories" | "footwear";
+}[] = [
   {
     name: "Cheetah Wool Coat",
     url: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=900&q=85",
@@ -661,7 +661,7 @@ export default function AdminPage() {
                           setFormData((prev) => ({
                             ...prev,
                             image: p.url,
-                            theme: p.theme as any,
+                            theme: p.theme,
                             composition: p.composition,
                             name: prev.name || p.name,
                           }))
@@ -686,17 +686,17 @@ export default function AdminPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
                   {[
                     {
-                      id: "Modern Muse",
+                      id: "Modern Muse" as const,
                       title: "Modern Muse",
                       desc: "Fluid silks & gowns",
                     },
                     {
-                      id: "City Safari",
+                      id: "City Safari" as const,
                       title: "City Safari",
                       desc: "Tailored wool coats & trousers",
                     },
                     {
-                      id: "Timeless Textures",
+                      id: "Timeless Textures" as const,
                       title: "Timeless Textures",
                       desc: "Python bags & pony pumps",
                     },
@@ -707,7 +707,7 @@ export default function AdminPage() {
                         type="button"
                         key={theme.id}
                         onClick={() =>
-                          setFormData({ ...formData, theme: theme.id as any })
+                          setFormData({ ...formData, theme: theme.id })
                         }
                         className={`p-2.5 rounded-xl border text-left transition-all ${
                           isSelected

@@ -28,7 +28,7 @@ export default function Header({
       <div className="bg-[#1E1B18] text-[#EAE2D7] text-[9px] sm:text-[11px] tracking-[0.2em] uppercase py-1.5 sm:py-2 px-3 sm:px-4 text-center">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="hidden md:flex items-center gap-3 text-[#C5B5A1]">
-            <span>FIRENZE ATELIER • VIA DE' TORNABUONI</span>
+            <span>FIRENZE ATELIER • VIA DE&apos; TORNABUONI</span>
             <span>•</span>
             <Link
               href="/admin"
@@ -230,7 +230,7 @@ export default function Header({
           </ul>
 
           <div className="mt-4 pt-3 border-t border-[#2C2621]/10 text-center text-[9px] tracking-[0.2em] text-[#8C7A6B]">
-            VIA DE' TORNABUONI 18, FIRENZE
+            VIA DE&apos; TORNABUONI 18, FIRENZE
           </div>
         </div>
       )}

@@ -52,7 +52,7 @@ export default function StorySection({
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
               <div className="absolute bottom-6 left-6 right-6 text-white">
                 <span className="text-[9px] tracking-[0.3em] uppercase text-[#C5B5A1] block font-semibold">
-                  VIA DE' TORNABUONI, FIRENZE
+                  VIA DE&apos; TORNABUONI, FIRENZE
                 </span>
                 <p className="font-serif text-xl uppercase tracking-wide mt-1">
                   WHERE REFINED WILDNESS MEETS RENAISSANCE ARCHITECTURE

@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Image from "next/image";
-import { Compass, Sparkles, ArrowRight, Eye, Check } from "lucide-react";
+import { Compass, Sparkles, ArrowRight } from "lucide-react";
 import { Product } from "@/data/products";
 import { formatNaira } from "@/lib/currency";
 
@@ -305,17 +305,17 @@ export default function HeroLookbook({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {[
                 {
-                  id: "Modern Muse",
+                  id: "Modern Muse" as const,
                   title: "Modern Muse",
                   desc: "Fluid silks & slip gowns",
                 },
                 {
-                  id: "City Safari",
+                  id: "City Safari" as const,
                   title: "City Safari",
                   desc: "Tailored wool coats & trousers",
                 },
                 {
-                  id: "Timeless Textures",
+                  id: "Timeless Textures" as const,
                   title: "Timeless Textures",
                   desc: "Python bags & pony pumps",
                 },
@@ -326,7 +326,7 @@ export default function HeroLookbook({
                     key={theme.id}
                     onClick={() =>
                       onSelectTheme(
-                        isSelected ? "All" : (theme.id as any)
+                        isSelected ? "All" : theme.id
                       )
                     }
                     className={`p-2.5 rounded-xl border text-left transition-all ${

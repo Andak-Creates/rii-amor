@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, Check, Calendar, Clock, MapPin, Sparkles, User, Mail, Phone } from "lucide-react";
+import { X, Check, MapPin } from "lucide-react";
 
 interface AtelierBookingModalProps {
   isOpen: boolean;
@@ -110,7 +110,7 @@ export default function AtelierBookingModal({
                     <span>Firenze Atelier</span>
                   </div>
                   <p className="text-[10px] text-[#8C7A6B] mt-0.5">
-                    Via de' Tornabuoni 18, Florence
+                    Via de&apos; Tornabuoni 18, Florence
                   </p>
                 </button>
 

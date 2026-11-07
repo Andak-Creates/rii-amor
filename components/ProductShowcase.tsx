@@ -125,7 +125,7 @@ export default function ProductShowcase({
                 }`}
               >
                 {/* Product Image Frame */}
-                <div className="relative w-full sm:w-1/2 aspect-[4/5] rounded-xl overflow-hidden bg-[#EDE5DC] shrink-0 border border-[#2C2621]/10">
+                <div className="relative w-full sm:w-1/2 aspect-[4/3] sm:aspect-[4/5] max-h-72 sm:max-h-none rounded-xl overflow-hidden bg-[#EDE5DC] shrink-0 border border-[#2C2621]/10">
                   <Image
                     src={product.image}
                     alt={product.name}
