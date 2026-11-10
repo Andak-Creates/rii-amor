@@ -102,6 +102,7 @@ export default function AdminPage() {
   });
 
   const [previewMode, setPreviewMode] = useState<"card" | "dossier">("card");
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   // Fetch live products
   const fetchProducts = async () => {
@@ -278,6 +279,28 @@ export default function AdminPage() {
     });
   };
 
+  // Reorder images (drag and drop or move)
+  const moveImage = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+    setFormData((prev) => {
+      const updated = [...prev.images];
+      const [moved] = updated.splice(fromIndex, 1);
+      updated.splice(toIndex, 0, moved);
+      return {
+        ...prev,
+        images: updated,
+        image: updated[0] || "",
+        secondaryImage: updated[1] || updated[0] || "",
+      };
+    });
+  };
+
+  const makeCover = (idx: number) => {
+    if (idx === 0) return;
+    moveImage(idx, 0);
+    showNotification("success", "Set as cover image!");
+  };
+
   // Quick Restock Toggle / Quantity Adjuster
   const handleToggleStock = async (product: Product) => {
     const newStockState = !product.inStock;
@@ -393,7 +416,13 @@ export default function AdminPage() {
       return;
     }
 
-    const primaryImage = formData.image || formData.images[0] || "";
+    // Ensure the primary cover image is strictly the 1st image in images array if available
+    const primaryImage =
+      formData.images.length > 0 ? formData.images[0] : formData.image || "";
+    const secondaryImage =
+      formData.images.length > 1
+        ? formData.images[1]
+        : formData.secondaryImage || primaryImage;
     const resolvedName = formData.name.trim() || `Piece #${products.length + 1}`;
 
     const resolvedQuantity =
@@ -405,7 +434,7 @@ export default function AdminPage() {
       ...formData,
       name: resolvedName,
       image: primaryImage,
-      secondaryImage: formData.secondaryImage || formData.images[1] || primaryImage,
+      secondaryImage: secondaryImage,
       price: formData.price ? parseFormattedNumber(String(formData.price)) : 0,
       quantity: resolvedQuantity,
       inStock: resolvedQuantity !== undefined ? resolvedQuantity > 0 && formData.inStock : formData.inStock,
@@ -415,7 +444,7 @@ export default function AdminPage() {
       images:
         formData.images.length > 0
           ? formData.images
-          : [primaryImage, formData.secondaryImage].filter(Boolean),
+          : [primaryImage, secondaryImage].filter(Boolean),
       id: editingId || undefined,
     };
 
@@ -752,41 +781,119 @@ export default function AdminPage() {
                 {/* Uploaded Images Strip */}
                 {formData.images.length > 0 && (
                   <div className="mt-3">
-                    <span className="text-[9px] tracking-wider uppercase text-[#8C7A6B] font-semibold block mb-1.5">
-                      {formData.images.length} Photo{formData.images.length > 1 ? "s" : ""} — Tap ✕ to remove
-                    </span>
-                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[9px] tracking-wider uppercase text-[#8C7A6B] font-semibold block">
+                        {formData.images.length} Photo{formData.images.length > 1 ? "s" : ""} — Drag or click &quot;Make Cover&quot; to reorder
+                      </span>
+                      <span className="text-[8px] text-[#8C6D46] uppercase font-medium">
+                        First image = Cover
+                      </span>
+                    </div>
+
+                    <div className="flex gap-2.5 overflow-x-auto pb-2 pt-1 scrollbar-none">
                       {formData.images.map((url, idx) => (
                         <div
                           key={url}
-                          className="relative shrink-0 w-16 h-20 rounded-xl overflow-hidden border-2 border-[#2C2621]/15 group"
+                          draggable
+                          onDragStart={() => setDraggedIndex(idx)}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={() => {
+                            if (draggedIndex !== null && draggedIndex !== idx) {
+                              moveImage(draggedIndex, idx);
+                              setDraggedIndex(null);
+                            }
+                          }}
+                          className={`relative shrink-0 w-20 h-24 rounded-xl overflow-hidden border-2 transition-all cursor-grab active:cursor-grabbing group ${
+                            idx === 0
+                              ? "border-[#1E1B18] shadow-sm ring-2 ring-[#C99742]/40"
+                              : "border-[#2C2621]/15 hover:border-[#1E1B18]"
+                          }`}
                         >
                           <Image
                             src={url}
                             alt={`Photo ${idx + 1}`}
                             fill
-                            className="object-cover"
+                            className="object-cover pointer-events-none"
                           />
-                          {/* Badge: Cover / Detail */}
+
+                          {/* Quick reorder controls (visible on hover / touch) */}
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-1">
+                            <div className="flex justify-between items-center">
+                              {idx > 0 ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    makeCover(idx);
+                                  }}
+                                  className="px-1.5 py-0.5 rounded bg-[#C99742] text-[#1E1B18] text-[7px] font-bold uppercase tracking-wider shadow"
+                                  title="Make this the Cover image"
+                                >
+                                  ★ Cover
+                                </button>
+                              ) : (
+                                <span className="px-1.5 py-0.5 rounded bg-[#1E1B18] text-[#FAF7F2] text-[7px] font-bold uppercase tracking-wider">
+                                  Cover
+                                </span>
+                              )}
+
+                              {/* Remove button */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  removeImage(url);
+                                }}
+                                className="w-4 h-4 rounded-full bg-[#992222] text-white text-[8px] flex items-center justify-center font-bold leading-none shadow"
+                                title="Remove photo"
+                              >
+                                ✕
+                              </button>
+                            </div>
+
+                            {/* Arrow buttons for mobile reordering */}
+                            <div className="flex justify-center gap-1">
+                              {idx > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    moveImage(idx, idx - 1);
+                                  }}
+                                  className="px-1.5 py-0.5 rounded bg-white/90 text-[#1E1B18] text-[8px] font-bold hover:bg-white shadow"
+                                  title="Move Left"
+                                >
+                                  ◀
+                                </button>
+                              )}
+                              {idx < formData.images.length - 1 && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    moveImage(idx, idx + 1);
+                                  }}
+                                  className="px-1.5 py-0.5 rounded bg-white/90 text-[#1E1B18] text-[8px] font-bold hover:bg-white shadow"
+                                  title="Move Right"
+                                >
+                                  ▶
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Default Badge when not hovered */}
                           <span
-                            className={`absolute bottom-0 left-0 right-0 text-center text-[7px] font-bold uppercase tracking-wider py-0.5 ${
+                            className={`absolute bottom-0 left-0 right-0 text-center text-[7px] font-bold uppercase tracking-wider py-0.5 group-hover:opacity-0 transition-opacity ${
                               idx === 0
-                                ? "bg-[#1E1B18]/80 text-[#C99742]"
+                                ? "bg-[#1E1B18] text-[#C99742]"
                                 : idx === 1
-                                ? "bg-[#2C2621]/70 text-white"
-                                : "bg-black/50 text-white"
+                                ? "bg-[#2C2621]/80 text-white"
+                                : "bg-black/60 text-white"
                             }`}
                           >
-                            {idx === 0 ? "Cover" : idx === 1 ? "Detail" : `+${idx}`}
+                            {idx === 0 ? "★ COVER" : idx === 1 ? "Detail" : `#${idx + 1}`}
                           </span>
-                          {/* Remove button */}
-                          <button
-                            type="button"
-                            onClick={() => removeImage(url)}
-                            className="absolute top-1 right-1 w-4 h-4 rounded-full bg-[#992222] text-white text-[8px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity font-bold leading-none"
-                          >
-                            ✕
-                          </button>
                         </div>
                       ))}
                     </div>
@@ -1134,14 +1241,14 @@ export default function AdminPage() {
                 </div>
               ) : (
                 /* DOSSIER MODAL PREVIEW */
-                <div className="bg-white rounded-xl p-3.5 border border-[#2C2621]/15 text-xs space-y-2">
-                  <div className="relative aspect-[16/10] rounded-lg overflow-hidden bg-[#EDE5DC]">
+                <div className="bg-white rounded-xl p-3.5 border border-[#2C2621]/15 text-xs space-y-2 max-w-xs mx-auto">
+                  <div className="relative aspect-[3/4] rounded-lg overflow-hidden bg-[#EDE5DC]">
                     {livePreviewProduct.image ? (
                     <Image
                       src={livePreviewProduct.image}
                       alt="Dossier"
                       fill
-                      className="object-cover"
+                      className="object-cover object-top"
                     />
                   ) : (
                     <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center text-[#8C7A6B]">
@@ -1156,7 +1263,11 @@ export default function AdminPage() {
                   <p className="font-serif text-sm font-semibold text-[#8C6D46]">
                     {formatNaira(livePreviewProduct.price)}
                   </p>
-                  
+                  {livePreviewProduct.description && (
+                    <p className="text-[10px] text-[#5C4D3C] line-clamp-2">
+                      {livePreviewProduct.description}
+                    </p>
+                  )}
                 </div>
               )}
             </div>

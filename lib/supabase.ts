@@ -1,11 +1,14 @@
 import { Product } from "@/data/products";
 
 const SUPABASE_URL = (
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "https://sypxbucrlhyqxkxfartw.supabase.co"
+  process.env.SUPABASE_URL ||
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  "https://sypxbucrlhyqxkxfartw.supabase.co"
 ).replace(/\/rest\/v1\/?$/, "").replace(/\/$/, "");
 
 const SERVICE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_ANON_KEY ||
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   "";
 

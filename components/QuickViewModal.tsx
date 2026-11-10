@@ -66,13 +66,13 @@ export default function QuickViewModal({
 
         {/* LEFT COLUMN: Visual Presentation */}
         <div className="relative w-full md:w-1/2 bg-[#EDE5DC] p-3 sm:p-5 flex flex-col justify-between shrink-0 border-b md:border-b-0 md:border-r border-[#2C2621]/15">
-          {/* Main Image Frame: controlled max height on mobile so it doesn't push the card out */}
-          <div className="relative h-44 sm:h-56 md:h-full md:min-h-[320px] w-full rounded-xl overflow-hidden shadow-inner border border-[#2C2621]/10 bg-[#E3D9CC]">
+          {/* Main Image Frame: tall and prominent across all screen sizes */}
+          <div className="relative aspect-[3/4] max-h-[46vh] sm:max-h-[50vh] md:max-h-none md:h-full md:min-h-[340px] w-full rounded-xl overflow-hidden shadow-inner border border-[#2C2621]/10 bg-[#E3D9CC]">
             <Image
               src={gallery[activeImageIdx] || product.image}
               alt={product.name}
               fill
-              className="object-cover transition-opacity duration-300"
+              className="object-cover object-top transition-opacity duration-300"
               priority
             />
 
