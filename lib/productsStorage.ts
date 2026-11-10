@@ -1,29 +1,28 @@
 import fs from "fs";
 import path from "path";
-import { Product, PRODUCTS as DEFAULT_PRODUCTS } from "@/data/products";
+import { Product } from "@/data/products";
 
 const DATA_FILE_PATH = path.join(process.cwd(), "data", "products.json");
 
 export function getStoredProducts(): Product[] {
   try {
     if (!fs.existsSync(DATA_FILE_PATH)) {
-      // Initialize with default products
       fs.writeFileSync(
         DATA_FILE_PATH,
-        JSON.stringify(DEFAULT_PRODUCTS, null, 2),
+        JSON.stringify([], null, 2),
         "utf-8"
       );
-      return DEFAULT_PRODUCTS;
+      return [];
     }
     const raw = fs.readFileSync(DATA_FILE_PATH, "utf-8");
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
+    if (Array.isArray(parsed)) {
       return parsed;
     }
-    return DEFAULT_PRODUCTS;
+    return [];
   } catch (error) {
     console.error("Error reading stored products:", error);
-    return DEFAULT_PRODUCTS;
+    return [];
   }
 }
 

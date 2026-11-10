@@ -17,22 +17,22 @@ export default function StorySection({
     {
       icon: Sparkles,
       title: "Hand-Aligned Rosettes",
-      desc: "Every leopard rosette and python gradient is aligned by hand across lapels, seams, and cuffs for continuous visual harmony.",
+      desc: "Every animalier motif and print gradient is aligned by hand across lapels, seams, and cuffs for continuous visual harmony.",
     },
     {
       icon: Shield,
       title: "Como Silk & Tuscan Wool",
-      desc: "Woven in legacy family-owned mills in Lombardy and Tuscany using double-faced virgin wool and 22-momme pure mulberry silk.",
+      desc: "Woven in legacy family-owned mills using double-faced virgin wool and 22-momme pure mulberry silk.",
     },
     {
       icon: HeartHandshake,
-      title: "Ethical Italian Craft",
-      desc: "Produced in limited seasonal runs of fewer than 150 pieces per style to ensure zero waste and master tailor attention.",
+      title: "Ethical Craftsmanship",
+      desc: "Produced in limited seasonal runs to ensure zero waste and master tailor attention to every stitch.",
     },
     {
       icon: Compass,
       title: "Florentine Heritage",
-      desc: "Conceived between the historic stone ateliers of Florence and the modern runways of Milan for the uncompromising muse.",
+      desc: "Conceived between the historic stone ateliers of Florence and modern runways for the uncompromising muse.",
     },
   ];
 
@@ -41,33 +41,59 @@ export default function StorySection({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Top Story Heading */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+          {/* Left Brand Heraldic Card — Pure Brand Identity, No Stock Photos */}
           <div className="lg:col-span-5 relative">
-            <div className="relative aspect-[4/5] rounded-2xl overflow-hidden border border-[#2C2621]/20 shadow-lg bg-[#DDD2C4]">
-              <Image
-                src="https://images.unsplash.com/photo-1543429776-2782fc8e1acd?auto=format&fit=crop&w=1200&q=85"
-                alt="Florence Architecture & Atelier Inspiration"
-                fill
-                className="object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
-              <div className="absolute bottom-6 left-6 right-6 text-white">
-                <span className="text-[9px] tracking-[0.3em] uppercase text-[#C5B5A1] block font-semibold">
-                  VIA DE&apos; TORNABUONI, FIRENZE
+            <div className="relative aspect-[4/5] rounded-2xl overflow-hidden border border-[#2C2621]/20 shadow-lg bg-[#1E1B18] p-8 sm:p-10 flex flex-col justify-between text-[#FAF7F2]">
+              {/* Gold Filigree Accent */}
+              <div className="flex items-center justify-between border-b border-[#C99742]/30 pb-4">
+                <span className="text-[9px] tracking-[0.35em] uppercase text-[#C99742] font-semibold">
+                  ARCHIVIO STORICO
                 </span>
-                <p className="font-serif text-xl uppercase tracking-wide mt-1">
+                <span className="text-[10px] tracking-widest text-[#8C7A6B]">
+                  FIRENZE
+                </span>
+              </div>
+
+              {/* Central Logo Crest */}
+              <div className="my-auto text-center flex flex-col items-center">
+                <div className="relative w-24 h-24 sm:w-28 sm:h-28 mb-4">
+                  <Image
+                    src="/images/logo-transparent.png"
+                    alt="Rii Amor Emblem"
+                    fill
+                    className="object-contain"
+                  />
+                </div>
+                <h3 className="font-serif text-2xl sm:text-3xl uppercase tracking-[0.2em] font-light text-[#FAF7F2]">
+                  RII AMOR
+                </h3>
+                <span className="text-[9px] tracking-[0.3em] uppercase text-[#C99742] mt-1 block">
+                  HAUTE ANIMALIER • ATELIER PRIVÉ
+                </span>
+              </div>
+
+              {/* Bottom Inscription */}
+              <div className="border-t border-[#C99742]/30 pt-4 text-center">
+                <p className="text-[9.5px] tracking-[0.22em] uppercase text-[#C5B5A1] leading-relaxed">
                   WHERE REFINED WILDNESS MEETS RENAISSANCE ARCHITECTURE
                 </p>
+                <span className="text-[8px] tracking-[0.25em] text-[#8C7A6B] uppercase block mt-1">
+                  VIA DE&apos; TORNABUONI 18, FIRENZE
+                </span>
               </div>
             </div>
 
-            {/* Overlapping small detail photo */}
-            <div className="hidden sm:block absolute -bottom-6 -right-6 w-44 h-44 rounded-xl overflow-hidden border-4 border-[#FAF7F2] shadow-xl">
-              <Image
-                src="https://images.unsplash.com/photo-1601924994987-69e26d50dc26?auto=format&fit=crop&w=600&q=80"
-                alt="Silk twill craftsmanship detail"
-                fill
-                className="object-cover"
-              />
+            {/* Overlapping Small Heritage Badge */}
+            <div className="hidden sm:flex absolute -bottom-5 -right-5 w-40 h-40 rounded-2xl bg-[#FAF7F2] border border-[#2C2621]/20 shadow-xl p-4 flex-col justify-between text-center">
+              <span className="text-[8px] tracking-[0.25em] uppercase text-[#8C6D46] font-semibold">
+                EDIZIONE LIMITATA
+              </span>
+              <p className="font-serif text-xs uppercase font-medium text-[#1E1B18] leading-snug">
+                100% ARTISANAL TAILORING
+              </p>
+              <span className="text-[7.5px] tracking-[0.18em] text-[#8C7A6B] uppercase">
+                ZERO COMPROMISE
+              </span>
             </div>
           </div>
 
@@ -138,4 +164,3 @@ export default function StorySection({
     </section>
   );
 }
-

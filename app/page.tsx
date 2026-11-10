@@ -6,36 +6,55 @@ import HeroLookbook from "@/components/HeroLookbook";
 import ProductShowcase from "@/components/ProductShowcase";
 import CartDrawer from "@/components/CartDrawer";
 import QuickViewModal from "@/components/QuickViewModal";
-import LookbookModal from "@/components/LookbookModal";
-import AtelierBookingModal from "@/components/AtelierBookingModal";
-import StorySection from "@/components/StorySection";
 import Footer from "@/components/Footer";
-import { PRODUCTS, INITIAL_CART, CartItem, Product } from "@/data/products";
+import { CartItem, Product } from "@/data/products";
+
+const CART_STORAGE_KEY = "rii_amor_cart_items";
 
 export default function Home() {
-  // Dynamic products list connected to the Admin API
-  const [productsList, setProductsList] = useState<Product[]>(PRODUCTS);
+  // Dynamic products list — starts empty, always loaded from API
+  const [productsList, setProductsList] = useState<Product[]>([]);
 
-  // Cart state preloaded with the 3 items from the reference mockup!
-  const [cart, setCart] = useState<CartItem[]>(INITIAL_CART);
+  // Cart state persisted via localStorage
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [isCartLoaded, setIsCartLoaded] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
 
-  // Wishlist state
-  const [wishlistIds, setWishlistIds] = useState<string[]>([
-    "florence-gown",
-    "cheetah-coat",
-  ]);
+  // Wishlist state — starts empty
+  const [wishlistIds, setWishlistIds] = useState<string[]>([]);
 
   // Modals state
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
-  const [isLookbookOpen, setIsLookbookOpen] = useState(false);
-  const [isAtelierOpen, setIsAtelierOpen] = useState(false);
-
-  // Active theme filter (Style Compass)
-  const [activeTheme, setActiveTheme] = useState<string>("All");
 
   // Toast notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // 1. Load cart from localStorage on initial client mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(CART_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setCart(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn("Could not load cart from localStorage", e);
+    } finally {
+      setIsCartLoaded(true);
+    }
+  }, []);
+
+  // 2. Persist cart changes to localStorage (only after initial load has finished)
+  useEffect(() => {
+    if (!isCartLoaded) return;
+    try {
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+    } catch (e) {
+      console.warn("Could not save cart to localStorage", e);
+    }
+  }, [cart, isCartLoaded]);
 
   // Load products from API on mount & on window focus (so admin changes reflect immediately!)
   const loadProducts = async () => {
@@ -43,7 +62,7 @@ export default function Home() {
       const res = await fetch("/api/products");
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setProductsList(data);
         }
       }
@@ -112,6 +131,15 @@ export default function Home() {
     showToast("Item removed from bag");
   };
 
+  const handleClearCart = () => {
+    setCart([]);
+    try {
+      localStorage.removeItem(CART_STORAGE_KEY);
+    } catch (e) {
+      console.warn("Could not clear cart localStorage", e);
+    }
+  };
+
   // Wishlist operations
   const handleToggleWishlist = (product: Product) => {
     setWishlistIds((prev) => {
@@ -137,48 +165,32 @@ export default function Home() {
         </div>
       )}
 
-      {/* Main Header with Reference Navigation & Admin portal link */}
+      {/* Main Header */}
       <Header
         cartCount={totalCartCount}
         wishlistCount={wishlistIds.length}
         onOpenCart={() => setIsCartOpen(true)}
-        onOpenLookbook={() => setIsLookbookOpen(true)}
-        onOpenAtelier={() => setIsAtelierOpen(true)}
       />
 
       <main className="flex-1">
-        {/* Hero & Lookbook Bento Grid Section from Reference Mockup */}
+        {/* Hero Section */}
         <HeroLookbook
           products={productsList}
-          onOpenLookbook={() => setIsLookbookOpen(true)}
           onOpenQuickView={(p) => setQuickViewProduct(p)}
-          onSelectTheme={(theme) => setActiveTheme(theme)}
-          activeTheme={activeTheme}
         />
 
-        {/* Curated Pieces & Full Collection dynamically populated */}
+        {/* Real Collection Grid & Category Filter */}
         <ProductShowcase
           products={productsList}
           onAddToCart={handleAddToCart}
           onOpenQuickView={(p) => setQuickViewProduct(p)}
           onToggleWishlist={handleToggleWishlist}
           wishlistIds={wishlistIds}
-          activeTheme={activeTheme}
-          onSelectTheme={(theme) => setActiveTheme(theme)}
-        />
-
-        {/* Our Story & Italian Animalier Craftsmanship */}
-        <StorySection
-          onOpenAtelier={() => setIsAtelierOpen(true)}
-          onOpenLookbook={() => setIsLookbookOpen(true)}
         />
       </main>
 
-      {/* Footer matching reference layout */}
-      <Footer
-        onOpenAtelier={() => setIsAtelierOpen(true)}
-        onOpenLookbook={() => setIsLookbookOpen(true)}
-      />
+      {/* Clean Store Footer */}
+      <Footer />
 
       {/* Interactive Cart Drawer */}
       <CartDrawer
@@ -187,6 +199,7 @@ export default function Home() {
         cart={cart}
         onUpdateQuantity={handleUpdateQuantity}
         onRemoveItem={handleRemoveFromCart}
+        onClearCart={handleClearCart}
       />
 
       {/* Product Quick View Modal */}
@@ -198,25 +211,6 @@ export default function Home() {
         isWishlisted={
           quickViewProduct ? wishlistIds.includes(quickViewProduct.id) : false
         }
-        onOpenAtelier={() => {
-          setQuickViewProduct(null);
-          setIsAtelierOpen(true);
-        }}
-      />
-
-      {/* Lookbook No. 4 Fullscreen Story Gallery */}
-      <LookbookModal
-        isOpen={isLookbookOpen}
-        onClose={() => setIsLookbookOpen(false)}
-        products={productsList}
-        onOpenQuickView={(p) => setQuickViewProduct(p)}
-        onAddToCart={handleAddToCart}
-      />
-
-      {/* Atelier VIP Booking Modal ("Visit Us") */}
-      <AtelierBookingModal
-        isOpen={isAtelierOpen}
-        onClose={() => setIsAtelierOpen(false)}
       />
     </div>
   );

@@ -12,6 +12,7 @@ interface CartDrawerProps {
   cart: CartItem[];
   onUpdateQuantity: (productId: string, size: string, delta: number) => void;
   onRemoveItem: (productId: string, size: string) => void;
+  onClearCart?: () => void;
 }
 
 export default function CartDrawer({
@@ -20,6 +21,7 @@ export default function CartDrawer({
   cart,
   onUpdateQuantity,
   onRemoveItem,
+  onClearCart,
 }: CartDrawerProps) {
   const [promoCode, setPromoCode] = useState("");
   const [discountApplied, setDiscountApplied] = useState(false);
@@ -62,6 +64,7 @@ export default function CartDrawer({
     setTimeout(() => {
       setIsCheckingOut(false);
       setOrderComplete(true);
+      onClearCart?.();
     }, 1500);
   };
 

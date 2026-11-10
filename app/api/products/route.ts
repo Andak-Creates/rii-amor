@@ -1,9 +1,28 @@
 import { NextResponse } from "next/server";
 import { getStoredProducts, saveStoredProducts } from "@/lib/productsStorage";
+import {
+  fetchProductsFromSupabase,
+  insertProductToSupabase,
+  updateProductInSupabase,
+  deleteProductFromSupabase,
+} from "@/lib/supabase";
 import { Product } from "@/data/products";
 
 // GET /api/products
 export async function GET() {
+  try {
+    // 1. Try reading live from Supabase
+    const supabaseProducts = await fetchProductsFromSupabase();
+    if (supabaseProducts !== null) {
+      // Sync to local file as backup cache
+      saveStoredProducts(supabaseProducts);
+      return NextResponse.json(supabaseProducts);
+    }
+  } catch (err) {
+    console.warn("Supabase fetch fallback to local:", err);
+  }
+
+  // 2. Fallback to local stored products
   const products = getStoredProducts();
   return NextResponse.json(products);
 }
@@ -24,49 +43,40 @@ export async function POST(request: Request) {
         "-" +
         Date.now().toString().slice(-4);
 
-    // Auto-assign next number label if needed (e.g. "9. TUSCAN SILK BLOUSE")
-    const nextNum = products.length + 1;
-    const numberLabel =
-      body.numberLabel && body.numberLabel.trim() !== ""
-        ? body.numberLabel
-        : `${nextNum}. ${body.name.toUpperCase()}`;
-
     const newProduct: Product = {
       id,
-      numberLabel,
-      name: body.name || "Untitled Archive Piece",
-      subtitle: body.subtitle || "Florentine Collection",
-      price: Number(body.price) || 120000,
+      numberLabel: body.numberLabel || undefined,
+      name: body.name || "Untitled Piece",
+      subtitle: body.subtitle || "",
+      price: typeof body.price === "number" ? body.price : (Number(body.price) || 0),
       originalPrice: body.originalPrice ? Number(body.originalPrice) : undefined,
-      category: body.category || "outerwear",
-      theme: body.theme || "Modern Muse",
+      category: body.category || "sets",
+      theme: body.theme || "Atelier Co-Ords",
       image:
-        body.image ||
-        "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=900&q=85",
+        body.image || (Array.isArray(body.images) && body.images[0]) || "",
       secondaryImage:
         body.secondaryImage ||
         body.image ||
-        "https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=900&q=85",
-      description:
-        body.description ||
-        "Hand-tailored Florentine animalier statement piece featuring artisanal print placement and sustainable Italian finishing.",
-      details: Array.isArray(body.details) && body.details.length > 0
-        ? body.details
-        : [
-            "Hand-finished in Florence atelier",
-            "Archival animalier print placement",
-            "100% Italian sustainable tailoring",
-          ],
-      composition:
-        body.composition || "100% Italian Silk Charmeuse • Mother of Pearl buttons",
+        (Array.isArray(body.images) && (body.images[1] || body.images[0])) ||
+        "",
+      images: Array.isArray(body.images) && body.images.length > 0
+        ? body.images
+        : [body.image, body.secondaryImage || body.image].filter(Boolean),
+      description: body.description || "",
+      details: Array.isArray(body.details) ? body.details : [],
+      composition: body.composition || "",
       sizes: Array.isArray(body.sizes) && body.sizes.length > 0
         ? body.sizes
-        : ["XS", "S", "M", "L"],
+        : ["Standard"],
       inStock: body.inStock !== undefined ? Boolean(body.inStock) : true,
+      quantity: body.quantity !== undefined ? (Number(body.quantity) || 0) : undefined,
       isHeroFeatured: Boolean(body.isHeroFeatured),
     };
 
-    // Prepend or append to products list
+    // Save to Supabase (in background/async)
+    await insertProductToSupabase(newProduct);
+
+    // Also update local cache
     const updated = [newProduct, ...products];
     saveStoredProducts(updated);
 
@@ -91,18 +101,35 @@ export async function PUT(request: Request) {
     const products = getStoredProducts();
     const index = products.findIndex((p) => p.id === body.id);
 
-    if (index === -1) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
-    }
-
     const updatedProduct: Product = {
-      ...products[index],
+      ...(index !== -1 ? products[index] : {}),
       ...body,
-      price: Number(body.price) || products[index].price,
+      price:
+        body.price !== undefined
+          ? typeof body.price === "number"
+            ? body.price
+            : Number(body.price) || 0
+          : index !== -1
+          ? products[index].price
+          : 0,
+      quantity:
+        body.quantity !== undefined
+          ? Number(body.quantity) || 0
+          : index !== -1
+          ? products[index].quantity
+          : undefined,
     };
 
-    products[index] = updatedProduct;
-    saveStoredProducts(products);
+    // Update in Supabase
+    await updateProductInSupabase(body.id, updatedProduct);
+
+    // Update local cache
+    if (index !== -1) {
+      products[index] = updatedProduct;
+      saveStoredProducts(products);
+    } else {
+      saveStoredProducts([updatedProduct, ...products]);
+    }
 
     return NextResponse.json(updatedProduct);
   } catch (error) {
@@ -122,20 +149,22 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Product id is required" }, { status: 400 });
     }
 
+    // Update in Supabase
+    await updateProductInSupabase(body.id, body);
+
     const products = getStoredProducts();
     const index = products.findIndex((p) => p.id === body.id);
 
-    if (index === -1) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    if (index !== -1) {
+      products[index] = {
+        ...products[index],
+        ...body,
+      };
+      saveStoredProducts(products);
+      return NextResponse.json(products[index]);
     }
 
-    products[index] = {
-      ...products[index],
-      ...body,
-    };
-
-    saveStoredProducts(products);
-    return NextResponse.json(products[index]);
+    return NextResponse.json(body);
   } catch (error) {
     console.error("Failed to patch product:", error);
     return NextResponse.json({ error: "Failed to update product" }, { status: 500 });
@@ -152,14 +181,13 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Product id is required" }, { status: 400 });
     }
 
+    // Delete in Supabase
+    await deleteProductFromSupabase(id);
+
     const products = getStoredProducts();
     const filtered = products.filter((p) => p.id !== id);
-
-    if (filtered.length === products.length) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
-    }
-
     saveStoredProducts(filtered);
+
     return NextResponse.json({ success: true, removedId: id });
   } catch (error) {
     console.error("Failed to delete product:", error);
@@ -169,4 +197,3 @@ export async function DELETE(request: Request) {
     );
   }
 }
-

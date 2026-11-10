@@ -16,9 +16,9 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: "RII AMOR | Haute Animalier & Curated Heritage Collections",
+  title: "RII AMOR | Haute Animalier & Curated Resort Collections",
   description:
-    "Explore the Florence Collection by Rii Amor — timeless leopard prints, Italian tailored coats, python silks, and artisan essentials for the modern muse.",
+    "Explore the Rii Amor Collection — statement animalier prints, lace-up two-piece sets, swimwear, and sculpted silhouettes.",
   icons: {
     icon: "/images/logo.jpg",
   },
