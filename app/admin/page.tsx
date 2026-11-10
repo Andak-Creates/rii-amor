@@ -1359,7 +1359,13 @@ export default function AdminPage() {
                         {p.name}
                       </h4>
 
-                      <p className="text-[10px] text-[#736555] line-clamp-1">Sizes: {p.sizes.join(", ")}</p>
+                      {p.description && p.description.trim() ? (
+                        <p className="text-[10px] text-[#5C4D3C] line-clamp-2 mt-0.5 max-w-xl italic">
+                          &ldquo;{p.description}&rdquo;
+                        </p>
+                      ) : null}
+
+                      <p className="text-[10px] text-[#736555] line-clamp-1 mt-0.5">Sizes: {p.sizes.join(", ")}</p>
                     </div>
                   </div>
 

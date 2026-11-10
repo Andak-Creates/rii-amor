@@ -14,7 +14,7 @@
       "/uploads/whatsapp-image-2026-11-09-at-1-12-24-pm-1--1794286943210.jpeg",
       "/uploads/whatsapp-image-2026-11-09-at-1-12-24-pm-1794286945275.jpeg"
     ],
-    "description": "Lace front",
+    "description": "",
     "composition": "",
     "details": [],
     "sizes": [
@@ -23,6 +23,7 @@
       "L"
     ],
     "inStock": true,
+    "quantity": 20,
     "isHeroFeatured": true
   },
   {
