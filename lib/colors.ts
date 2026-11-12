@@ -36,6 +36,9 @@ const FASHION_COLORS: Record<string, string> = {
   "oatmeal": "#E3DAC9",
 
   // Greens
+  "green": "#008000",
+  "dark green": "#006400",
+  "light green": "#90EE90",
   "emerald": "#097969",
   "emerald green": "#097969",
   "olive": "#556B2F",
@@ -55,6 +58,9 @@ const FASHION_COLORS: Record<string, string> = {
   "jade": "#00A86B",
 
   // Reds, Wines & Corals
+  "red": "#FF0000",
+  "dark red": "#8B0000",
+  "light red": "#FF6961",
   "burgundy": "#800020",
   "wine": "#722F37",
   "bordeaux": "#5C061B",
@@ -74,6 +80,10 @@ const FASHION_COLORS: Record<string, string> = {
   "brick": "#9C413D",
 
   // Pinks & Purples
+  "pink": "#FFC0CB",
+  "hot pink": "#FF69B4",
+  "purple": "#800080",
+  "dark purple": "#301934",
   "blush": "#DE5D83",
   "blush pink": "#DE5D83",
   "rose": "#FF007F",
@@ -90,6 +100,9 @@ const FASHION_COLORS: Record<string, string> = {
   "berry": "#8A2A54",
 
   // Blues
+  "blue": "#0000FF",
+  "dark blue": "#00008B",
+  "light blue": "#ADD8E6",
   "navy": "#000080",
   "navy blue": "#000080",
   "midnight": "#191970",
@@ -108,6 +121,11 @@ const FASHION_COLORS: Record<string, string> = {
   "slate blue": "#6A5ACD",
 
   // Yellows & Golds
+  "yellow": "#FFD700",
+  "bright yellow": "#FFFF00",
+  "orange": "#FF8C00",
+  "dark orange": "#FF6600",
+  "light orange": "#FFB347",
   "gold": "#D4AF37",
   "metallic gold": "#D4AF37",
   "amber": "#FFBF00",
@@ -119,6 +137,9 @@ const FASHION_COLORS: Record<string, string> = {
   "bronze": "#CD7F32",
 
   // Blacks, Greys & Whites
+  "brown": "#8B4513",
+  "dark brown": "#654321",
+  "light brown": "#A0785A",
   "noir": "#111111",
   "black": "#000000",
   "jet black": "#0A0A0A",
