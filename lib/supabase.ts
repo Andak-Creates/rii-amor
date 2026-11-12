@@ -319,10 +319,114 @@ export async function updateProductInSupabase(
   }
 }
 
+export function extractStorageFilename(
+  imageUrl: string,
+  bucket = "product-images"
+): string | null {
+  if (!imageUrl || typeof imageUrl !== "string") return null;
+  const marker = `/${bucket}/`;
+  const idx = imageUrl.indexOf(marker);
+  if (idx !== -1) {
+    const raw = imageUrl.substring(idx + marker.length).split("?")[0];
+    try {
+      return decodeURIComponent(raw);
+    } catch {
+      return raw;
+    }
+  }
+  return null;
+}
+
+export async function deleteImagesFromSupabaseStorage(
+  filenames: string[],
+  bucket = "product-images"
+): Promise<boolean> {
+  if (!SERVICE_KEY || !filenames.length) return false;
+
+  const valid = Array.from(new Set(filenames.filter(Boolean)));
+  if (!valid.length) return false;
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}`, {
+      method: "DELETE",
+      headers: {
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        prefixes: valid,
+      }),
+    });
+
+    if (res.ok) {
+      return true;
+    }
+
+    // Fallback: try individual delete
+    for (const fn of valid) {
+      try {
+        await fetch(
+          `${SUPABASE_URL}/storage/v1/object/${bucket}/${encodeURIComponent(fn)}`,
+          {
+            method: "DELETE",
+            headers: {
+              apikey: SERVICE_KEY,
+              Authorization: `Bearer ${SERVICE_KEY}`,
+            },
+          }
+        );
+      } catch {
+        // continue
+      }
+    }
+    return true;
+  } catch (error) {
+    console.error("Supabase storage delete error:", error);
+    return false;
+  }
+}
+
 export async function deleteProductFromSupabase(id: string): Promise<boolean> {
   if (!SERVICE_KEY) return false;
 
   try {
+    // 1. Fetch the piece first to discover all associated images in bucket
+    const imagesToDelete: string[] = [];
+    try {
+      const productRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/products?id=eq.${encodeURIComponent(id)}&select=*`,
+        {
+          headers: getHeaders(),
+        }
+      );
+      if (productRes.ok) {
+        const rows = await productRes.json();
+        if (Array.isArray(rows) && rows.length > 0) {
+          const p = rows[0];
+          if (typeof p.image === "string") imagesToDelete.push(p.image);
+          if (typeof p.secondary_image === "string") imagesToDelete.push(p.secondary_image);
+          if (Array.isArray(p.images)) {
+            for (const img of p.images) {
+              if (typeof img === "string") imagesToDelete.push(img);
+            }
+          }
+          if (Array.isArray(p.color_variants)) {
+            for (const cv of p.color_variants) {
+              if (cv && Array.isArray(cv.images)) {
+                for (const cImg of cv.images) {
+                  if (typeof cImg === "string") imagesToDelete.push(cImg);
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to retrieve images prior to product deletion:", err);
+    }
+
+    // 2. Delete the product row from the database
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/products?id=eq.${encodeURIComponent(id)}`,
       {
@@ -330,7 +434,20 @@ export async function deleteProductFromSupabase(id: string): Promise<boolean> {
         headers: getHeaders(),
       }
     );
-    return res.ok;
+
+    if (res.ok) {
+      // 3. Automatically delete all associated images from the storage bucket
+      const filenames = imagesToDelete
+        .map((url) => extractStorageFilename(url, "product-images"))
+        .filter((name): name is string => Boolean(name));
+
+      if (filenames.length > 0) {
+        await deleteImagesFromSupabaseStorage(filenames, "product-images");
+      }
+      return true;
+    }
+
+    return false;
   } catch (error) {
     console.error("Supabase delete error:", error);
     return false;

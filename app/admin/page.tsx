@@ -311,6 +311,15 @@ export default function AdminPage() {
             : prev.secondaryImage,
       };
     });
+
+    // Also delete from Supabase storage bucket if uploaded there
+    if (url.includes("/product-images/")) {
+      fetch(`/api/upload?url=${encodeURIComponent(url)}`, {
+        method: "DELETE",
+      }).catch((err) => {
+        console.warn("Storage cleanup failed for:", url, err);
+      });
+    }
   };
 
   // Reorder images (drag and drop or move)
@@ -481,10 +490,22 @@ export default function AdminPage() {
   };
 
   const handleRemoveColorVariant = (idx: number) => {
+    const variantToRemove = formData.colorVariants[idx];
     setFormData((prev) => ({
       ...prev,
       colorVariants: prev.colorVariants.filter((_, i) => i !== idx),
     }));
+
+    // Delete photos of this removed colorway from storage
+    if (variantToRemove?.images?.length) {
+      for (const imgUrl of variantToRemove.images) {
+        if (imgUrl.includes("/product-images/")) {
+          fetch(`/api/upload?url=${encodeURIComponent(imgUrl)}`, {
+            method: "DELETE",
+          }).catch(() => {});
+        }
+      }
+    }
   };
 
   const handleVariantImageUpload = async (
@@ -540,6 +561,14 @@ export default function AdminPage() {
       };
       return { ...prev, colorVariants: updated };
     });
+
+    if (imgUrl.includes("/product-images/")) {
+      fetch(`/api/upload?url=${encodeURIComponent(imgUrl)}`, {
+        method: "DELETE",
+      }).catch((err) => {
+        console.warn("Storage cleanup failed for variant image:", imgUrl, err);
+      });
+    }
   };
 
   const moveColorVariant = (fromIdx: number, toIdx: number) => {

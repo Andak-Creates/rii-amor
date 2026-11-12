@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import path from "path";
-import { uploadImageToSupabaseStorage } from "@/lib/supabase";
+import {
+  uploadImageToSupabaseStorage,
+  deleteImagesFromSupabaseStorage,
+  extractStorageFilename,
+} from "@/lib/supabase";
 
 export async function POST(request: Request) {
   try {
@@ -52,6 +56,31 @@ export async function POST(request: Request) {
     console.error("Upload handler exception:", error);
     return NextResponse.json(
       { error: "Failed to process image upload." },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const url = searchParams.get("url");
+    const rawFilename = searchParams.get("filename");
+    const filename = rawFilename || (url ? extractStorageFilename(url) : null);
+
+    if (!filename) {
+      return NextResponse.json(
+        { error: "Filename or url is required to delete from storage" },
+        { status: 400 }
+      );
+    }
+
+    const success = await deleteImagesFromSupabaseStorage([filename]);
+    return NextResponse.json({ success, deleted: filename });
+  } catch (err) {
+    console.error("Storage delete handler exception:", err);
+    return NextResponse.json(
+      { error: "Failed to delete file from storage bucket." },
       { status: 500 }
     );
   }
