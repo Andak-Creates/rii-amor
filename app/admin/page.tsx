@@ -126,6 +126,7 @@ export default function AdminPage() {
 
   const [previewMode, setPreviewMode] = useState<"card" | "dossier">("card");
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(true);
 
   // Fetch live products
   const fetchProducts = async () => {
@@ -932,6 +933,7 @@ export default function AdminPage() {
       colorVariants: product.colorVariants ? [...product.colorVariants] : [],
     });
     window.scrollTo({ top: 120, behavior: "smooth" });
+    setIsFormOpen(true);
     showNotification("success", `Editing "${product.name}"`);
   };
 
@@ -1326,8 +1328,13 @@ export default function AdminPage() {
             {/* 2-COLUMN WORKSPACE */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
           {/* LEFT COLUMN: THE FORM (7 cols) */}
-          <div className="lg:col-span-7 bg-[#FAF7F2] rounded-2xl p-5 sm:p-7 border border-[#2C2621]/15 shadow-sm">
-            <div className="flex items-center justify-between border-b border-[#2C2621]/10 pb-3 mb-5">
+          <div className="lg:col-span-7 bg-[#FAF7F2] rounded-2xl border border-[#2C2621]/15 shadow-sm overflow-hidden">
+            {/* Collapsible Header */}
+            <button
+              type="button"
+              onClick={() => setIsFormOpen((v) => !v)}
+              className="w-full flex items-center justify-between p-5 sm:p-7 pb-3 sm:pb-5 border-b border-[#2C2621]/10 text-left"
+            >
               <div>
                 <span className="text-[9px] tracking-[0.25em] uppercase text-[#8C7A6B] font-semibold block">
                   {editingId
@@ -1340,14 +1347,20 @@ export default function AdminPage() {
                     : "Add an Item to the Wardrobe"}
                 </h3>
               </div>
-
-              {editingId && (
-                <span className="px-2.5 py-0.5 bg-[#C99742]/20 text-[#8C6D46] rounded-full text-[9px] font-semibold uppercase tracking-wider">
-                  Editing
+              <div className="flex items-center gap-2 shrink-0">
+                {editingId && (
+                  <span className="px-2.5 py-0.5 bg-[#C99742]/20 text-[#8C6D46] rounded-full text-[9px] font-semibold uppercase tracking-wider">
+                    Editing
+                  </span>
+                )}
+                <span className={`w-7 h-7 flex items-center justify-center rounded-full border border-[#2C2621]/20 text-[#5C4D3C] transition-transform duration-200 ${isFormOpen ? "rotate-180" : "rotate-0"}`}>
+                  ▾
                 </span>
-              )}
-            </div>
+              </div>
+            </button>
 
+            {isFormOpen && (
+            <div className="p-5 sm:p-7 pt-5">
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* SECTION 1: IDENTITY */}
               <div>
@@ -1431,16 +1444,23 @@ export default function AdminPage() {
                     type="button"
                     onClick={() => {
                       setColorMode("single");
-                      if (formData.images.length === 0 && formData.colorVariants.length > 0) {
-                        const leadPhotos = formData.colorVariants[0].images;
-                        if (leadPhotos && leadPhotos.length > 0) {
-                          setFormData((prev) => ({
-                            ...prev,
-                            images: [...leadPhotos],
-                            image: leadPhotos[0] || prev.image,
-                          }));
-                        }
-                      }
+                      // Migrate lead colorway photos to single-mode images, then clear colorVariants
+                      setFormData((prev) => {
+                        const leadPhotos =
+                          prev.colorVariants.length > 0 ? prev.colorVariants[0].images : [];
+                        return {
+                          ...prev,
+                          images:
+                            prev.images.length === 0 && leadPhotos.length > 0
+                              ? [...leadPhotos]
+                              : prev.images,
+                          image:
+                            prev.images.length === 0 && leadPhotos.length > 0
+                              ? leadPhotos[0]
+                              : prev.image,
+                          colorVariants: [], // ← clear all colorways when switching to single
+                        };
+                      });
                     }}
                     className={`py-2 px-3 rounded-lg text-[10px] sm:text-xs uppercase tracking-wider font-semibold transition-all flex items-center justify-center gap-1.5 ${
                       colorMode === "single"
@@ -2529,6 +2549,8 @@ export default function AdminPage() {
                 </button>
               </div>
             </form>
+            </div>
+            )}
           </div>
 
           {/* RIGHT COLUMN: REAL-TIME STOREFRONT PREVIEW (5 cols) */}
