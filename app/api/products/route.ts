@@ -109,6 +109,12 @@ export async function PUT(request: Request) {
         body.quantity !== undefined
           ? Number(body.quantity) || 0
           : undefined,
+      colorVariants:
+        body.colorVariants !== undefined
+          ? Array.isArray(body.colorVariants) && body.colorVariants.length > 0
+            ? body.colorVariants
+            : null
+          : undefined,
     };
 
     const success = await updateProductInSupabase(body.id, updatedProduct);

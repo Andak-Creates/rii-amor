@@ -804,7 +804,7 @@ export default function AdminPage() {
     let primaryImage = "";
     let secondaryImage = "";
     let finalImages: string[] = [];
-    let finalColorVariants: ColorVariant[] | undefined = undefined;
+    let finalColorVariants: ColorVariant[] | null = null;
 
     if (colorMode === "single") {
       finalImages =
@@ -818,9 +818,10 @@ export default function AdminPage() {
         finalImages.length > 1
           ? finalImages[1]
           : formData.secondaryImage || primaryImage;
-      finalColorVariants = undefined;
+      finalColorVariants = null;
     } else {
-      finalColorVariants = formData.colorVariants;
+      finalColorVariants =
+        formData.colorVariants.length > 0 ? formData.colorVariants : null;
       // First colorway with photos provides the storefront catalog cover
       const leadColorway =
         formData.colorVariants.find(
@@ -1444,7 +1445,9 @@ export default function AdminPage() {
                     type="button"
                     onClick={() => {
                       setColorMode("single");
-                      // Migrate lead colorway photos to single-mode images, then clear colorVariants
+                      // Copy photos over if single-mode images are empty, but do NOT delete colorVariants in memory
+                      // in case the user was just checking something and switches back!
+                      // It will ONLY be deleted when they actually click Save/Publish.
                       setFormData((prev) => {
                         const leadPhotos =
                           prev.colorVariants.length > 0 ? prev.colorVariants[0].images : [];
@@ -1458,7 +1461,6 @@ export default function AdminPage() {
                             prev.images.length === 0 && leadPhotos.length > 0
                               ? leadPhotos[0]
                               : prev.image,
-                          colorVariants: [], // ← clear all colorways when switching to single
                         };
                       });
                     }}
@@ -2553,7 +2555,8 @@ export default function AdminPage() {
             )}
           </div>
 
-          {/* RIGHT COLUMN: REAL-TIME STOREFRONT PREVIEW (5 cols) */}
+          {/* RIGHT COLUMN: REAL-TIME STOREFRONT PREVIEW (5 cols) — only visible when form is open */}
+          {isFormOpen && (
           <div className="lg:col-span-5 sticky top-20">
             <div className="bg-[#FAF7F2] rounded-2xl p-4 sm:p-5 border border-[#2C2621]/20 shadow-sm">
               <div className="flex items-center justify-between pb-2.5 mb-3 border-b border-[#2C2621]/10">
@@ -2688,6 +2691,7 @@ export default function AdminPage() {
               )}
             </div>
           </div>
+          )}
         </div>
 
         {/* INVENTORY CATALOG TABLE: Instant Restock & Delete with 1 Click */}

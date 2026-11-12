@@ -272,7 +272,12 @@ export async function updateProductInSupabase(
     if (product.inStock !== undefined) updatePayload.in_stock = product.inStock;
     if (product.quantity !== undefined) updatePayload.quantity = product.quantity;
     if (product.isHeroFeatured !== undefined) updatePayload.is_hero_featured = product.isHeroFeatured;
-    if (product.colorVariants !== undefined) updatePayload.color_variants = product.colorVariants;
+    if (product.colorVariants !== undefined) {
+      updatePayload.color_variants =
+        Array.isArray(product.colorVariants) && product.colorVariants.length > 0
+          ? product.colorVariants
+          : null;
+    }
 
     let res = await fetch(
       `${SUPABASE_URL}/rest/v1/products?id=eq.${encodeURIComponent(id)}`,
