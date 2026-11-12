@@ -4,6 +4,7 @@ export interface ColorVariant {
   images: string[];
   quantity?: number;
   price?: number;
+  sizes?: string[];
 }
 
 export interface Product {

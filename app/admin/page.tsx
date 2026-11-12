@@ -77,6 +77,7 @@ export default function AdminPage() {
   const [newColorHex, setNewColorHex] = useState("#1E1B18");
   const [newColorQuantity, setNewColorQuantity] = useState("");
   const [newColorPrice, setNewColorPrice] = useState("");
+  const [newColorSizes, setNewColorSizes] = useState<string[]>(["S", "M", "L"]);
   const [stagedColorImages, setStagedColorImages] = useState<string[]>([]);
   const [isUploadingStagedColor, setIsUploadingStagedColor] = useState(false);
   const stagedColorFileInputRef = useRef<HTMLInputElement>(null);
@@ -561,6 +562,8 @@ export default function AdminPage() {
       newColorPrice.trim() !== ""
         ? Math.max(0, parseFormattedNumber(newColorPrice.trim()) || 0)
         : undefined;
+    const variantSizes =
+      newColorSizes.length > 0 ? [...newColorSizes] : ["S", "M", "L"];
 
     setFormData((prev) => ({
       ...prev,
@@ -572,6 +575,7 @@ export default function AdminPage() {
           images: [...stagedColorImages],
           quantity: parsedQty,
           price: parsedPrice,
+          sizes: variantSizes,
         },
       ],
     }));
@@ -581,6 +585,7 @@ export default function AdminPage() {
     setNewColorHex("#1E1B18");
     setNewColorQuantity("");
     setNewColorPrice("");
+    setNewColorSizes(["S", "M", "L"]);
     setStagedColorImages([]);
     if (stagedColorFileInputRef.current) stagedColorFileInputRef.current.value = "";
     showNotification(
@@ -609,6 +614,15 @@ export default function AdminPage() {
       ...prev,
       colorVariants: prev.colorVariants.map((cv, i) =>
         i === idx ? { ...cv, price } : cv
+      ),
+    }));
+  };
+
+  const handleUpdateColorVariantSizes = (idx: number, sizes: string[]) => {
+    setFormData((prev) => ({
+      ...prev,
+      colorVariants: prev.colorVariants.map((cv, i) =>
+        i === idx ? { ...cv, sizes } : cv
       ),
     }));
   };
@@ -743,6 +757,24 @@ export default function AdminPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validate Piece Name (Required)
+    if (!formData.name.trim()) {
+      showNotification("error", "Piece Name is required.");
+      return;
+    }
+
+    // Validate Price (Required)
+    const enteredPrice = formData.price
+      ? parseFormattedNumber(String(formData.price))
+      : 0;
+    if (!enteredPrice || enteredPrice <= 0) {
+      showNotification(
+        "error",
+        "Price is required and must be greater than ₦0."
+      );
+      return;
+    }
+
     if (colorMode === "single") {
       if (!formData.image && formData.images.length === 0) {
         showNotification(
@@ -799,8 +831,6 @@ export default function AdminPage() {
       finalImages = leadImages;
     }
 
-    const resolvedName = formData.name.trim() || `Piece #${products.length + 1}`;
-
     const hasColorwayQuantities =
       colorMode === "variants" &&
       formData.colorVariants.some((cv) => cv.quantity !== undefined);
@@ -817,19 +847,29 @@ export default function AdminPage() {
         ? Math.max(0, parseInt(String(formData.quantity), 10) || 0)
         : totalColorwayQuantity;
 
-    const leadColorwayPrice =
-      formData.colorVariants.find((cv) => cv.price && cv.price > 0)?.price;
+    // Union of all colorway sizes if in variants mode
+    const allVariantSizes = Array.from(
+      new Set(
+        formData.colorVariants.flatMap((cv) =>
+          cv.sizes && cv.sizes.length > 0 ? cv.sizes : ["S", "M", "L"]
+        )
+      )
+    );
 
-    const resolvedPrice = formData.price
-      ? parseFormattedNumber(String(formData.price))
-      : leadColorwayPrice || 0;
+    const resolvedSizes =
+      colorMode === "variants" && allVariantSizes.length > 0
+        ? allVariantSizes
+        : formData.sizes.length > 0
+        ? formData.sizes
+        : ["S", "M", "L"];
 
     const payload = {
       ...formData,
-      name: resolvedName,
+      name: formData.name.trim(),
       image: primaryImage,
       secondaryImage: secondaryImage,
-      price: resolvedPrice,
+      price: enteredPrice,
+      sizes: resolvedSizes,
       quantity: resolvedQuantity,
       inStock:
         resolvedQuantity !== undefined
@@ -902,6 +942,7 @@ export default function AdminPage() {
     setNewColorHex("#1E1B18");
     setNewColorQuantity("");
     setNewColorPrice("");
+    setNewColorSizes(["S", "M", "L"]);
     setStagedColorImages([]);
     setFormData({
       name: "",
@@ -1317,11 +1358,11 @@ export default function AdminPage() {
                 <div className="space-y-3">
                   <div>
                     <label className="text-[10px] tracking-wider uppercase text-[#8C7A6B] block mb-1 font-semibold">
-                      PIECE NAME <span className="text-[9px] font-normal text-[#8C7A6B]">(OPTIONAL)</span>
+                      PIECE NAME <span className="text-[9px] font-bold text-[#992222]">* REQUIRED</span>
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. Musera lace up two piece capri set (or leave blank)"
+                      placeholder="e.g. Musera lace up two piece capri set"
                       value={formData.name}
                       onChange={(e) => handleNameChange(e.target.value)}
                       className="w-full bg-white border border-[#2C2621]/20 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-[#1E1B18] placeholder:text-[#8C7A6B] focus:outline-none focus:border-[#1E1B18]"
@@ -1330,7 +1371,7 @@ export default function AdminPage() {
 
                   <div>
                     <label className="text-[10px] tracking-wider uppercase text-[#8C7A6B] block mb-1 font-semibold">
-                      PRICE (₦ NAIRA) <span className="text-[9px] font-normal text-[#8C7A6B]">(OPTIONAL)</span>
+                      PRICE (₦ NAIRA) <span className="text-[9px] font-bold text-[#992222]">* REQUIRED</span>
                     </label>
                     <div className="relative">
                       <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#1E1B18] pointer-events-none">
@@ -1339,7 +1380,7 @@ export default function AdminPage() {
                       <input
                         type="text"
                         inputMode="numeric"
-                        placeholder="e.g. 39,000 (leave blank if price on request)"
+                        placeholder="e.g. 85,000"
                         value={
                           typeof formData.price === "number"
                             ? formatNumberWithCommas(formData.price)
@@ -1720,6 +1761,45 @@ export default function AdminPage() {
                         </div>
                       </div>
 
+                      {/* Available Sizes for this Colorway */}
+                      <div className="pt-2 border-t border-[#2C2621]/10">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-[9px] uppercase tracking-wider text-[#8C7A6B] font-semibold">
+                            Available Sizes for &ldquo;{newColorName.trim() || "this color"}&rdquo;
+                          </label>
+                          <span className="text-[8.5px] text-[#8C7A6B]">
+                            {newColorSizes.length > 0
+                              ? newColorSizes.join(", ")
+                              : "None selected"}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {["XS", "S", "M", "L", "XL", "One Size"].map((size) => {
+                            const isSelected = newColorSizes.includes(size);
+                            return (
+                              <button
+                                type="button"
+                                key={size}
+                                onClick={() => {
+                                  setNewColorSizes((prev) =>
+                                    prev.includes(size)
+                                      ? prev.filter((s) => s !== size)
+                                      : [...prev, size]
+                                  );
+                                }}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-semibold uppercase border transition-all ${
+                                  isSelected
+                                    ? "bg-[#1E1B18] text-white border-[#1E1B18]"
+                                    : "bg-white text-[#736555] border-[#2C2621]/20 hover:border-[#1E1B18]"
+                                }`}
+                              >
+                                {size} {isSelected && "✓"}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
                       {/* Colorway Quantity & Optional Custom Price */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-[#2C2621]/10">
                         <div>
@@ -2058,6 +2138,38 @@ export default function AdminPage() {
                               </div>
                             </div>
 
+                            {/* Colorway Available Sizes Row */}
+                            <div className="flex items-center gap-2 mb-2.5 p-2 bg-[#FAF7F2] rounded-xl border border-[#2C2621]/10 flex-wrap">
+                              <span className="text-[9px] uppercase tracking-wider font-semibold text-[#8C7A6B] shrink-0">
+                                Sizes for this color:
+                              </span>
+                              <div className="flex flex-wrap gap-1">
+                                {["XS", "S", "M", "L", "XL", "One Size"].map((size) => {
+                                  const currentSizes = cv.sizes || ["S", "M", "L"];
+                                  const isSelected = currentSizes.includes(size);
+                                  return (
+                                    <button
+                                      type="button"
+                                      key={size}
+                                      onClick={() => {
+                                        const updated = isSelected
+                                          ? currentSizes.filter((s) => s !== size)
+                                          : [...currentSizes, size];
+                                        handleUpdateColorVariantSizes(vIdx, updated);
+                                      }}
+                                      className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase border transition-all ${
+                                        isSelected
+                                          ? "bg-[#1E1B18] text-white border-[#1E1B18]"
+                                          : "bg-white text-[#736555] border-[#2C2621]/15 hover:border-[#1E1B18]"
+                                      }`}
+                                    >
+                                      {size} {isSelected && "✓"}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
                             {/* Colorway Upload Controls & Photo Strip */}
                             <div className="mt-2.5">
                               {/* Upload Button */}
@@ -2273,139 +2385,101 @@ export default function AdminPage() {
               {/* SECTION 4: SIZES, QUANTITY & STOCK STATUS */}
               <div className="pt-4 border-t border-[#2C2621]/10">
                 <h4 className="text-xs tracking-[0.2em] uppercase font-semibold text-[#8C6D46] mb-2">
-                  4. SIZES, QUANTITY & STOCK
+                  {colorMode === "variants"
+                    ? "4. AVAILABILITY & DISPLAY"
+                    : "4. SIZES, QUANTITY & STOCK"}
                 </h4>
 
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {["XS", "S", "M", "L", "XL", "One Size"].map((size) => {
-                    const isSelected = formData.sizes.includes(size);
-                    return (
-                      <button
-                        type="button"
-                        key={size}
-                        onClick={() => toggleSize(size)}
-                        className={`px-3 py-1 rounded-lg text-xs font-semibold uppercase border transition-all ${
-                          isSelected
-                            ? "bg-[#1E1B18] text-white border-[#1E1B18]"
-                            : "bg-white text-[#736555] border-[#2C2621]/20 hover:border-[#1E1B18]"
-                        }`}
-                      >
-                        {size} {isSelected && "✓"}
-                      </button>
-                    );
-                  })}
-                </div>
+                {colorMode === "single" ? (
+                  <>
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {["XS", "S", "M", "L", "XL", "One Size"].map((size) => {
+                        const isSelected = formData.sizes.includes(size);
+                        return (
+                          <button
+                            type="button"
+                            key={size}
+                            onClick={() => toggleSize(size)}
+                            className={`px-3 py-1 rounded-lg text-xs font-semibold uppercase border transition-all ${
+                              isSelected
+                                ? "bg-[#1E1B18] text-white border-[#1E1B18]"
+                                : "bg-white text-[#736555] border-[#2C2621]/20 hover:border-[#1E1B18]"
+                            }`}
+                          >
+                            {size} {isSelected && "✓"}
+                          </button>
+                        );
+                      })}
+                    </div>
 
-                {/* Available Quantity Field */}
-                <div className="mb-3.5 bg-white p-3 rounded-xl border border-[#2C2621]/15">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-[10px] tracking-wider uppercase text-[#8C7A6B] font-semibold block">
-                      Number of Pieces Available (Stock Count)
-                    </label>
-                    <span className="text-[9px] text-[#8C7A6B]">
-                      {colorMode === "variants" &&
-                      formData.colorVariants.some((cv) => cv.quantity !== undefined)
-                        ? "Colorway stock breakdown"
-                        : "Leave empty if unlimited"}
-                    </span>
-                  </div>
-
-                  {colorMode === "variants" &&
-                    formData.colorVariants.length > 0 &&
-                    formData.colorVariants.some(
-                      (cv) => cv.quantity !== undefined
-                    ) && (
-                      <div className="mb-2 p-2 bg-[#FAF7F2] rounded-lg border border-[#2C2621]/10 text-xs">
-                        <div className="flex items-center justify-between text-[11px] font-semibold text-[#1E1B18]">
-                          <span>Sum of colorway stocks:</span>
-                          <span className="font-bold text-[#8C6D46]">
-                            {formData.colorVariants.reduce(
-                              (sum, cv) => sum + (cv.quantity ?? 0),
-                              0
-                            )}{" "}
-                            pieces total
-                          </span>
-                        </div>
-                        <div className="flex gap-1.5 flex-wrap mt-1 text-[10px] text-[#736555]">
-                          {formData.colorVariants.map((cv) => (
-                            <span
-                              key={cv.name}
-                              className="inline-flex items-center gap-1 bg-white px-2 py-0.5 rounded border border-[#2C2621]/10"
-                            >
-                              <span
-                                className="w-2 h-2 rounded-full inline-block"
-                                style={{
-                                  backgroundColor: cv.hex || "#8C7A6B",
-                                }}
-                              />
-                              {cv.name}:{" "}
-                              <strong>
-                                {cv.quantity !== undefined
-                                  ? `${cv.quantity} in stock`
-                                  : "∞"}
-                              </strong>
-                            </span>
-                          ))}
-                        </div>
+                    {/* Available Quantity Field for Single Color */}
+                    <div className="mb-3.5 bg-white p-3 rounded-xl border border-[#2C2621]/15">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-[10px] tracking-wider uppercase text-[#8C7A6B] font-semibold block">
+                          Number of Pieces Available (Stock Count)
+                        </label>
+                        <span className="text-[9px] text-[#8C7A6B]">
+                          Leave empty if unlimited
+                        </span>
                       </div>
-                    )}
 
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder={
-                        colorMode === "variants" &&
-                        formData.colorVariants.some(
-                          (cv) => cv.quantity !== undefined
-                        )
-                          ? String(
-                              formData.colorVariants.reduce(
-                                (sum, cv) => sum + (cv.quantity ?? 0),
-                                0
-                              )
-                            )
-                          : "e.g. 5, 10, 20"
-                      }
-                      value={formData.quantity}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        const num = parseInt(val, 10);
-                        setFormData({
-                          ...formData,
-                          quantity: val,
-                          inStock: val === "" ? formData.inStock : num > 0,
-                        });
-                      }}
-                      className="w-36 bg-[#EDE5DC]/40 border border-[#2C2621]/20 rounded-lg px-3 py-1.5 text-xs font-medium focus:outline-none focus:border-[#1E1B18]"
-                    />
-                    <span className="text-[11px] text-[#5C4D3C]">
-                      {formData.quantity !== "" &&
-                      parseInt(String(formData.quantity), 10) === 0 ? (
-                        <span className="text-[#992222] font-semibold">
-                          0 pieces — will show as Sold Out
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="e.g. 5, 10, 20"
+                          value={formData.quantity}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const num = parseInt(val, 10);
+                            setFormData({
+                              ...formData,
+                              quantity: val,
+                              inStock: val === "" ? formData.inStock : num > 0,
+                            });
+                          }}
+                          className="w-36 bg-[#EDE5DC]/40 border border-[#2C2621]/20 rounded-lg px-3 py-1.5 text-xs font-medium focus:outline-none focus:border-[#1E1B18]"
+                        />
+                        <span className="text-[11px] text-[#5C4D3C]">
+                          {formData.quantity !== "" &&
+                          parseInt(String(formData.quantity), 10) === 0 ? (
+                            <span className="text-[#992222] font-semibold">
+                              0 pieces — will show as Sold Out
+                            </span>
+                          ) : formData.quantity !== "" ? (
+                            <span>
+                              {formData.quantity} piece
+                              {parseInt(String(formData.quantity), 10) === 1
+                                ? ""
+                                : "s"}{" "}
+                              in stock
+                            </span>
+                          ) : (
+                            <span className="text-[#8C7A6B]">Unlimited stock</span>
+                          )}
                         </span>
-                      ) : formData.quantity !== "" ? (
-                        <span>
-                          {formData.quantity} piece
-                          {parseInt(String(formData.quantity), 10) === 1
-                            ? ""
-                            : "s"}{" "}
-                          in stock
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  /* Multiple Colorways Mode: sizes and quantities are configured per-colorway in Section 2 */
+                  <div className="mb-3.5 p-3.5 bg-white rounded-xl border border-[#2C2621]/15 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-[#1E1B18] uppercase text-[10px] tracking-wider">
+                        Sizes &amp; Stock Managed Per Colorway
+                      </span>
+                      {formData.colorVariants.length > 0 && (
+                        <span className="text-[10px] uppercase font-bold text-[#8C6D46] px-2.5 py-0.5 bg-[#EDE5DC]/60 rounded-full">
+                          {formData.colorVariants.length} Colorway
+                          {formData.colorVariants.length > 1 ? "s" : ""}
                         </span>
-                      ) : colorMode === "variants" &&
-                        formData.colorVariants.some(
-                          (cv) => cv.quantity !== undefined
-                        ) ? (
-                        <span className="text-[#8C6D46] font-medium">
-                          Auto-summed from colorways
-                        </span>
-                      ) : (
-                        <span className="text-[#8C7A6B]">Unlimited stock</span>
                       )}
-                    </span>
+                    </div>
+                    <p className="text-[11px] text-[#736555] mt-1 leading-relaxed">
+                      Sizes and available stock quantities are set directly on each individual colorway in Section 2 above.
+                    </p>
                   </div>
-                </div>
+                )}
 
                 <div className="flex items-center gap-6">
                   <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-[#1E1B18]">

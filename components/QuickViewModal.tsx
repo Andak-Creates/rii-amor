@@ -30,11 +30,17 @@ export default function QuickViewModal({
   // Initialize defaults whenever product changes
   useEffect(() => {
     if (product) {
-      setSelectedSize(product.sizes?.[0] || "Standard");
       if (product.colorVariants && product.colorVariants.length > 0) {
-        setSelectedColor(product.colorVariants[0].name);
+        const leadCv = product.colorVariants[0];
+        setSelectedColor(leadCv.name);
+        const leadSizes =
+          leadCv.sizes && leadCv.sizes.length > 0
+            ? leadCv.sizes
+            : product.sizes;
+        setSelectedSize(leadSizes?.[0] || "Standard");
       } else {
         setSelectedColor("");
+        setSelectedSize(product.sizes?.[0] || "Standard");
       }
       setActiveImageIdx(0);
     }
@@ -84,6 +90,12 @@ export default function QuickViewModal({
   const handleColorSelect = (colorName: string) => {
     setSelectedColor(colorName);
     setActiveImageIdx(0);
+    const cv = product.colorVariants?.find((c) => c.name === colorName);
+    if (cv?.sizes && cv.sizes.length > 0) {
+      if (!cv.sizes.includes(selectedSize)) {
+        setSelectedSize(cv.sizes[0]);
+      }
+    }
   };
 
   const handleAdd = () => {
@@ -291,31 +303,43 @@ export default function QuickViewModal({
               </div>
             ) : null}
 
-            {/* Sizing */}
-            {product.sizes && product.sizes.length > 0 && (
-              <div>
-                <div className="flex items-center justify-between text-[10px] tracking-wider uppercase text-[#8C7A6B] mb-1.5">
-                  <span className="font-semibold">SELECT SIZE</span>
-                </div>
+            {/* Sizing - uses colorway sizes if available, else product sizes */}
+            {(() => {
+              const availableSizes =
+                activeColorVariant?.sizes && activeColorVariant.sizes.length > 0
+                  ? activeColorVariant.sizes
+                  : product.sizes;
 
-                <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                  {product.sizes.map((size) => (
-                    <button
-                      type="button"
-                      key={size}
-                      onClick={() => setSelectedSize(size)}
-                      className={`h-7 sm:h-8 px-2.5 sm:px-3 rounded-lg text-[10px] sm:text-xs font-medium uppercase border transition-all ${
-                        currentSize === size
-                          ? "bg-[#1E1B18] text-[#FAF7F2] border-[#1E1B18] shadow-xs"
-                          : "bg-[#EDE5DC]/60 text-[#2C2621] border-[#2C2621]/15 hover:border-[#1E1B18]"
-                      }`}
-                    >
-                      {size}
-                    </button>
-                  ))}
+              if (!availableSizes || availableSizes.length === 0) return null;
+
+              return (
+                <div>
+                  <div className="flex items-center justify-between text-[10px] tracking-wider uppercase text-[#8C7A6B] mb-1.5">
+                    <span className="font-semibold">
+                      SELECT SIZE
+                      {selectedColor ? ` FOR ${selectedColor.toUpperCase()}` : ""}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                    {availableSizes.map((size) => (
+                      <button
+                        type="button"
+                        key={size}
+                        onClick={() => setSelectedSize(size)}
+                        className={`h-7 sm:h-8 px-2.5 sm:px-3 rounded-lg text-[10px] sm:text-xs font-medium uppercase border transition-all ${
+                          currentSize === size
+                            ? "bg-[#1E1B18] text-[#FAF7F2] border-[#1E1B18] shadow-xs"
+                            : "bg-[#EDE5DC]/60 text-[#2C2621] border-[#2C2621]/15 hover:border-[#1E1B18]"
+                        }`}
+                      >
+                        {size}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Craftsmanship Highlights - only if admin explicitly added details */}
             {product.details && product.details.length > 0 ? (

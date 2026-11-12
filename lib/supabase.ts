@@ -58,6 +58,7 @@ function mapDbToProduct(row: Record<string, unknown>): Product {
             item.price !== undefined && item.price !== null && item.price !== ""
               ? Number(item.price)
               : undefined,
+          sizes: Array.isArray(item.sizes) ? (item.sizes as string[]) : undefined,
         })) as ColorVariant[];
       }
     } catch {
