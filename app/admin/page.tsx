@@ -539,7 +539,17 @@ export default function AdminPage() {
       return;
     }
 
-    const resolvedHex = resolveColorNameToHex(trimmed) || newColorHex;
+    const resolvedHex =
+      resolveColorNameToHex(trimmed) ||
+      (newColorHex !== "#1E1B18" ? newColorHex : null) ||
+      (() => {
+        // Generate a warm, muted color from the name string so the dot is never plain black
+        let hash = 0;
+        for (let i = 0; i < trimmed.length; i++)
+          hash = trimmed.charCodeAt(i) + ((hash << 5) - hash);
+        const h = Math.abs(hash) % 360;
+        return `hsl(${h}, 45%, 52%)`;
+      })();
 
     setFormData((prev) => ({
       ...prev,
@@ -1593,55 +1603,24 @@ export default function AdminPage() {
                         </span>
                       </div>
 
-                      {/* Step 1: Color Name and Swatch */}
-                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-                        <div className="sm:col-span-8">
-                          <label className="text-[9px] uppercase tracking-wider text-[#8C7A6B] font-semibold block mb-1">
-                            1. Colorway Name
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Hazel nut, Noir, Emerald Green, Burgundy"
-                            value={newColorName}
-                            onChange={(e) => handleColorNameChange(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                handleAddColorVariant();
-                              }
-                            }}
-                            className="w-full bg-[#EDE5DC]/40 border border-[#2C2621]/20 rounded-xl px-3 py-2 text-xs text-[#1E1B18] placeholder:text-[#8C7A6B] focus:outline-none focus:border-[#1E1B18]"
-                          />
-
-                          {/* Live Color Recognition Indicator */}
-                          {newColorName.trim() && resolveColorNameToHex(newColorName) && (
-                            <div className="flex items-center gap-1.5 mt-1 text-[9px] text-[#2A4D33] font-semibold">
-                              <span
-                                className="w-2.5 h-2.5 rounded-full border border-black/20 shadow-xs shrink-0"
-                                style={{ backgroundColor: newColorHex }}
-                              />
-                              <span>Recognized shade ({newColorHex}) — color swatch matched!</span>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="sm:col-span-4">
-                          <label className="text-[9px] uppercase tracking-wider text-[#8C7A6B] font-semibold block mb-1">
-                            Swatch Color
-                          </label>
-                          <div className="flex items-center gap-2 bg-[#EDE5DC]/40 border border-[#2C2621]/20 rounded-xl px-2.5 py-1.5">
-                            <input
-                              type="color"
-                              value={newColorHex}
-                              onChange={(e) => setNewColorHex(e.target.value)}
-                              className="w-7 h-7 rounded-lg cursor-pointer border-0 bg-transparent p-0"
-                              title="Fine-tune swatch color"
-                            />
-                            <span className="text-[10px] font-mono font-medium text-[#5C4D3C] uppercase truncate">
-                              {newColorHex}
-                            </span>
-                          </div>
-                        </div>
+                      {/* Step 1: Color Name */}
+                      <div>
+                        <label className="text-[9px] uppercase tracking-wider text-[#8C7A6B] font-semibold block mb-1">
+                          1. Colorway Name
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Hazel nut, Noir, Emerald Green, Burgundy"
+                          value={newColorName}
+                          onChange={(e) => handleColorNameChange(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleAddColorVariant();
+                            }
+                          }}
+                          className="w-full bg-[#EDE5DC]/40 border border-[#2C2621]/20 rounded-xl px-3 py-2 text-xs text-[#1E1B18] placeholder:text-[#8C7A6B] focus:outline-none focus:border-[#1E1B18]"
+                        />
                       </div>
 
                       {/* Quick-Pick Popular Fashion Palette */}
@@ -1761,7 +1740,13 @@ export default function AdminPage() {
                         >
                           <Plus className="w-4 h-4" />
                           <span>
-                            ADD &ldquo;{newColorName.trim() || "COLORWAY"}&rdquo; TO PIECE
+                            {newColorHex && newColorHex !== "#1E1B18" && (
+                              <span
+                                className="inline-block w-2.5 h-2.5 rounded-full border border-white/40 mr-1.5 align-middle"
+                                style={{ backgroundColor: newColorHex }}
+                              />
+                            )}
+                            ADD {newColorName.trim() || "COLORWAY"} PIECE
                             {stagedColorImages.length > 0
                               ? ` (${stagedColorImages.length} PHOTO${stagedColorImages.length > 1 ? "S" : ""})`
                               : ""}
@@ -1795,12 +1780,10 @@ export default function AdminPage() {
                             {/* Colorway Header */}
                             <div className="flex items-center justify-between pb-2 border-b border-[#2C2621]/10 gap-2 flex-wrap">
                               <div className="flex items-center gap-2">
-                                {cv.hex && (
-                                  <span
+                                <span
                                     className="w-4 h-4 rounded-full border border-black/20 shrink-0 shadow-xs"
-                                    style={{ backgroundColor: cv.hex }}
+                                    style={{ backgroundColor: cv.hex || "#8C7A6B" }}
                                   />
-                                )}
                                 <span className="font-serif text-sm uppercase font-semibold text-[#1E1B18]">
                                   {cv.name}
                                 </span>
