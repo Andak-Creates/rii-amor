@@ -71,6 +71,7 @@ export default function Footer() {
               src="/images/logo-transparent.png"
               alt="Rii Amor"
               fill
+              sizes="80px"
               className="object-contain"
             />
           </div>

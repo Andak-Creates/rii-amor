@@ -81,6 +81,7 @@ export default function HeroLookbook({
                   src={currentHero.image}
                   alt={currentHero.name}
                   fill
+                  sizes="(max-width: 1024px) 100vw, 50vw"
                   className="object-cover object-top transition-transform duration-1000 group-hover:scale-105"
                   priority
                 />
@@ -137,6 +138,7 @@ export default function HeroLookbook({
                         src={item.image}
                         alt={item.name}
                         fill
+                        sizes="33vw"
                         className="object-cover"
                       />
                     )}
@@ -186,6 +188,7 @@ export default function HeroLookbook({
                     src={card1Product.image}
                     alt={card1Product.name}
                     fill
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                     className="object-cover group-hover:scale-105 transition-transform duration-700"
                   />
                 )}
@@ -245,6 +248,7 @@ export default function HeroLookbook({
                         src={card2Product.image}
                         alt={card2Product.name}
                         fill
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                         className="object-cover object-top group-hover:scale-105 transition-transform duration-500"
                       />
                     )}

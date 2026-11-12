@@ -105,6 +105,7 @@ export default function QuickViewModal({
               src={gallery[activeImageIdx] || product.image}
               alt={product.name}
               fill
+              sizes="(max-width: 768px) 100vw, 50vw"
               className="object-cover object-top transition-opacity duration-300"
               priority
             />
@@ -141,6 +142,7 @@ export default function QuickViewModal({
                   src={url}
                   alt={`View ${idx + 1}`}
                   fill
+                  sizes="52px"
                   className="object-cover"
                 />
               </button>

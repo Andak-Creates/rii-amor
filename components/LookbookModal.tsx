@@ -79,6 +79,7 @@ export default function LookbookModal({
                 src={currentProduct.image}
                 alt={currentProduct.name}
                 fill
+                sizes="(max-width: 768px) 100vw, 58vw"
                 className="object-cover object-top"
                 priority
               />
@@ -141,6 +142,7 @@ export default function LookbookModal({
                       src={currentProduct.image}
                       alt={currentProduct.name}
                       fill
+                      sizes="64px"
                       className="object-cover"
                     />
                   </div>
@@ -209,6 +211,7 @@ export default function LookbookModal({
                 src="/images/logo-transparent.png"
                 alt="Rii Amor"
                 fill
+                sizes="64px"
                 className="object-contain"
               />
             </div>

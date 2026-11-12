@@ -61,6 +61,7 @@ export default function StorySection({
                     src="/images/logo-transparent.png"
                     alt="Rii Amor Emblem"
                     fill
+                    sizes="112px"
                     className="object-contain"
                   />
                 </div>

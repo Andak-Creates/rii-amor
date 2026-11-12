@@ -80,6 +80,7 @@ export default function Header({
                   src="/images/logo-transparent.png"
                   alt="Rii Amor Logo"
                   fill
+                  sizes="80px"
                   className="object-contain"
                   priority
                 />
