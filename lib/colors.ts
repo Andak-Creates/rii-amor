@@ -177,3 +177,4 @@ export function resolveColorNameToHex(input: string): string | null {
 
   return null;
 }
+

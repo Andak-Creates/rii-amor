@@ -71,7 +71,8 @@ export default function AdminPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
 
-  // Color variant creation state
+  // Color variant creation state & mode
+  const [colorMode, setColorMode] = useState<"single" | "variants">("single");
   const [newColorName, setNewColorName] = useState("");
   const [newColorHex, setNewColorHex] = useState("#1E1B18");
   const [variantUploadingIdx, setVariantUploadingIdx] = useState<number | null>(null);
@@ -541,6 +542,30 @@ export default function AdminPage() {
     });
   };
 
+  const moveColorVariant = (fromIdx: number, toIdx: number) => {
+    setFormData((prev) => {
+      const variants = [...prev.colorVariants];
+      if (toIdx < 0 || toIdx >= variants.length) return prev;
+      const [moved] = variants.splice(fromIdx, 1);
+      variants.splice(toIdx, 0, moved);
+      return { ...prev, colorVariants: variants };
+    });
+  };
+
+  const moveVariantImage = (variantIdx: number, fromIdx: number, toIdx: number) => {
+    setFormData((prev) => {
+      const variants = [...prev.colorVariants];
+      const target = { ...variants[variantIdx] };
+      const imgs = [...target.images];
+      if (toIdx < 0 || toIdx >= imgs.length) return prev;
+      const [moved] = imgs.splice(fromIdx, 1);
+      imgs.splice(toIdx, 0, moved);
+      target.images = imgs;
+      variants[variantIdx] = target;
+      return { ...prev, colorVariants: variants };
+    });
+  };
+
   // Order status update
   const handleUpdateOrderStatus = async (orderId: string, status: Order["status"]) => {
     try {
@@ -565,18 +590,62 @@ export default function AdminPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.image && formData.images.length === 0) {
-      showNotification("error", "Please upload at least one photo from your device.");
-      return;
+    if (colorMode === "single") {
+      if (!formData.image && formData.images.length === 0) {
+        showNotification(
+          "error",
+          "Please upload at least one photo from your device."
+        );
+        return;
+      }
+    } else {
+      if (formData.colorVariants.length === 0) {
+        showNotification("error", "Please add at least one colorway.");
+        return;
+      }
+      const hasAnyPhoto = formData.colorVariants.some(
+        (cv) => cv.images && cv.images.length > 0
+      );
+      if (!hasAnyPhoto) {
+        showNotification(
+          "error",
+          "Please upload at least one photo for your colorways."
+        );
+        return;
+      }
     }
 
-    // Ensure the primary cover image is strictly the 1st image in images array if available
-    const primaryImage =
-      formData.images.length > 0 ? formData.images[0] : formData.image || "";
-    const secondaryImage =
-      formData.images.length > 1
-        ? formData.images[1]
-        : formData.secondaryImage || primaryImage;
+    let primaryImage = "";
+    let secondaryImage = "";
+    let finalImages: string[] = [];
+    let finalColorVariants: ColorVariant[] | undefined = undefined;
+
+    if (colorMode === "single") {
+      finalImages =
+        formData.images.length > 0
+          ? formData.images
+          : formData.image
+          ? [formData.image]
+          : [];
+      primaryImage = finalImages[0] || formData.image || "";
+      secondaryImage =
+        finalImages.length > 1
+          ? finalImages[1]
+          : formData.secondaryImage || primaryImage;
+      finalColorVariants = undefined;
+    } else {
+      finalColorVariants = formData.colorVariants;
+      // First colorway with photos provides the storefront catalog cover
+      const leadColorway =
+        formData.colorVariants.find(
+          (cv) => cv.images && cv.images.length > 0
+        ) || formData.colorVariants[0];
+      const leadImages = leadColorway?.images || [];
+      primaryImage = leadImages[0] || "";
+      secondaryImage = leadImages[1] || primaryImage;
+      finalImages = leadImages;
+    }
+
     const resolvedName = formData.name.trim() || `Piece #${products.length + 1}`;
 
     const resolvedQuantity =
@@ -591,16 +660,15 @@ export default function AdminPage() {
       secondaryImage: secondaryImage,
       price: formData.price ? parseFormattedNumber(String(formData.price)) : 0,
       quantity: resolvedQuantity,
-      inStock: resolvedQuantity !== undefined ? resolvedQuantity > 0 && formData.inStock : formData.inStock,
+      inStock:
+        resolvedQuantity !== undefined
+          ? resolvedQuantity > 0 && formData.inStock
+          : formData.inStock,
       details: [],
       composition: "",
       subtitle: formData.theme,
-      images:
-        formData.images.length > 0
-          ? formData.images
-          : [primaryImage, secondaryImage].filter(Boolean),
-      colorVariants:
-        formData.colorVariants.length > 0 ? formData.colorVariants : undefined,
+      images: finalImages,
+      colorVariants: finalColorVariants,
       id: editingId || undefined,
     };
 
@@ -633,6 +701,10 @@ export default function AdminPage() {
   // Load into form for editing
   const handleEdit = (product: Product) => {
     setEditingId(product.id);
+    const hasVariants = Boolean(
+      product.colorVariants && product.colorVariants.length > 0
+    );
+    setColorMode(hasVariants ? "variants" : "single");
     setFormData({
       name: product.name,
       price: formatNumberWithCommas(product.price),
@@ -654,6 +726,9 @@ export default function AdminPage() {
 
   const resetForm = () => {
     setEditingId(null);
+    setColorMode("single");
+    setNewColorName("");
+    setNewColorHex("#1E1B18");
     setFormData({
       name: "",
       price: "",
@@ -671,6 +746,15 @@ export default function AdminPage() {
     });
   };
 
+  const leadVariantImage = formData.colorVariants.find(
+    (cv) => cv.images && cv.images.length > 0
+  )?.images[0];
+
+  const previewPrimaryImage =
+    colorMode === "variants"
+      ? leadVariantImage || formData.image || formData.images[0] || ""
+      : formData.image || formData.images[0] || "";
+
   const livePreviewProduct: Product = {
     id: editingId || "preview-piece",
     name: formData.name || "Untitled Piece",
@@ -678,16 +762,22 @@ export default function AdminPage() {
     price: parseFormattedNumber(String(formData.price)) || 39000,
     category: formData.category,
     theme: formData.theme,
-    image: formData.image || formData.images[0] || "",
-    secondaryImage: formData.secondaryImage || formData.image || formData.images[1] || formData.images[0] || "",
+    image: previewPrimaryImage,
+    secondaryImage: previewPrimaryImage,
     description: formData.description || "",
     details: [],
     composition: "",
     sizes: formData.sizes.length > 0 ? formData.sizes : ["Standard"],
     inStock: formData.inStock,
     isHeroFeatured: formData.isHeroFeatured,
-    images: formData.images.length > 0 ? formData.images : undefined,
-    colorVariants: formData.colorVariants.length > 0 ? formData.colorVariants : undefined,
+    images:
+      colorMode === "variants"
+        ? (formData.colorVariants.find((cv) => cv.images && cv.images.length > 0)?.images || [])
+        : (formData.images.length > 0 ? formData.images : undefined),
+    colorVariants:
+      colorMode === "variants" && formData.colorVariants.length > 0
+        ? formData.colorVariants
+        : undefined,
   };
 
   return (
@@ -1106,407 +1196,583 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* SECTION 2: DEVICE PHOTO UPLOAD — MULTIPLE IMAGES */}
+              {/* SECTION 2: PHOTOGRAPHY & COLOR OPTIONS */}
               <div className="pt-4 border-t border-[#2C2621]/10">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
                   <h4 className="text-xs tracking-[0.2em] uppercase font-semibold text-[#8C6D46] flex items-center gap-1.5">
                     <Camera className="w-3.5 h-3.5" />
-                    <span>2. PHOTOS FROM YOUR DEVICE</span>
+                    <span>2. PHOTOGRAPHY &amp; COLOR OPTIONS</span>
                   </h4>
                   <span className="text-[9px] text-[#8C7A6B]">
-                    Select multiple at once
+                    Choose single piece or color variants
                   </span>
                 </div>
 
-                {/* Hidden multi-file input */}
-                <input
-                  type="file"
-                  ref={multiFileInputRef}
-                  accept="image/*"
-                  multiple
-                  onChange={handleMultipleImageUpload}
-                  className="hidden"
-                  id="multi-photo-upload"
-                />
+                {/* MODE TOGGLE: Single Color vs Multiple Colorways */}
+                <div className="grid grid-cols-2 gap-2 p-1 bg-[#EDE5DC]/60 rounded-xl border border-[#2C2621]/15 mb-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setColorMode("single");
+                      if (formData.images.length === 0 && formData.colorVariants.length > 0) {
+                        const leadPhotos = formData.colorVariants[0].images;
+                        if (leadPhotos && leadPhotos.length > 0) {
+                          setFormData((prev) => ({
+                            ...prev,
+                            images: [...leadPhotos],
+                            image: leadPhotos[0] || prev.image,
+                          }));
+                        }
+                      }
+                    }}
+                    className={`py-2 px-3 rounded-lg text-[10px] sm:text-xs uppercase tracking-wider font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                      colorMode === "single"
+                        ? "bg-[#1E1B18] text-[#FAF7F2] shadow-xs"
+                        : "text-[#5C4D3C] hover:text-[#1E1B18] hover:bg-white/50"
+                    }`}
+                  >
+                    <span>Single Color Piece</span>
+                  </button>
 
-                {/* Upload Drop Zone */}
-                <div className="bg-white border-2 border-dashed border-[#2C2621]/20 rounded-2xl p-4 sm:p-5 text-center hover:border-[#1E1B18] transition-all">
-                  <div className="flex flex-col items-center justify-center">
-                    <div className="w-10 h-10 rounded-full bg-[#EDE5DC] text-[#1E1B18] flex items-center justify-center mb-2">
-                      <UploadCloud className="w-5 h-5" />
-                    </div>
-
-                    <label
-                      htmlFor="multi-photo-upload"
-                      className="cursor-pointer px-4 py-2 bg-[#1E1B18] hover:bg-[#8C6D46] text-white rounded-full text-[10px] tracking-wider uppercase font-semibold transition-all shadow-xs"
-                    >
-                      {isUploading
-                        ? "Uploading photos..."
-                        : "Choose Photos from Device"}
-                    </label>
-
-                    <p className="text-[10px] text-[#8C7A6B] mt-2">
-                      Select multiple photos at once · PNG, JPG, WEBP · Works on mobile &amp; laptop
-                    </p>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setColorMode("variants");
+                      if (formData.colorVariants.length === 0 && formData.images.length > 0) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          colorVariants: [
+                            {
+                              name: "Main Color",
+                              hex: "#1E1B18",
+                              images: [...prev.images],
+                            },
+                          ],
+                        }));
+                      }
+                    }}
+                    className={`py-2 px-3 rounded-lg text-[10px] sm:text-xs uppercase tracking-wider font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                      colorMode === "variants"
+                        ? "bg-[#1E1B18] text-[#FAF7F2] shadow-xs"
+                        : "text-[#5C4D3C] hover:text-[#1E1B18] hover:bg-white/50"
+                    }`}
+                  >
+                    <Palette className="w-3.5 h-3.5" />
+                    <span>Multiple Colorways</span>
+                    {formData.colorVariants.length > 0 && (
+                      <span className="w-4 h-4 rounded-full bg-[#8C6D46] text-[#FAF7F2] text-[8px] flex items-center justify-center font-bold">
+                        {formData.colorVariants.length}
+                      </span>
+                    )}
+                  </button>
                 </div>
 
-                {/* Uploaded Images Strip */}
-                {formData.images.length > 0 && (
-                  <div className="mt-3">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[9px] tracking-wider uppercase text-[#8C7A6B] font-semibold block">
-                        {formData.images.length} Photo{formData.images.length > 1 ? "s" : ""} — Drag or click &quot;Make Cover&quot; to reorder
-                      </span>
-                      <span className="text-[8px] text-[#8C6D46] uppercase font-medium">
-                        First image = Cover
+                {/* ── BRANCH A: SINGLE COLOR PIECE PHOTOS ── */}
+                {colorMode === "single" && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[10px] text-[#736555]">
+                        Upload photos for this single piece directly. First photo will automatically serve as the catalog cover.
+                      </p>
+                      <span className="text-[9px] text-[#8C7A6B]">
+                        Select multiple at once
                       </span>
                     </div>
 
-                    <div className="flex gap-2.5 overflow-x-auto pb-2 pt-1 scrollbar-none">
-                      {formData.images.map((url, idx) => (
-                        <div
-                          key={url}
-                          draggable
-                          onDragStart={() => setDraggedIndex(idx)}
-                          onDragOver={(e) => e.preventDefault()}
-                          onDrop={() => {
-                            if (draggedIndex !== null && draggedIndex !== idx) {
-                              moveImage(draggedIndex, idx);
-                              setDraggedIndex(null);
-                            }
-                          }}
-                          className={`relative shrink-0 w-20 h-24 rounded-xl overflow-hidden border-2 transition-all cursor-grab active:cursor-grabbing group ${
-                            idx === 0
-                              ? "border-[#1E1B18] shadow-sm ring-2 ring-[#C99742]/40"
-                              : "border-[#2C2621]/15 hover:border-[#1E1B18]"
-                          }`}
+                    {/* Hidden multi-file input */}
+                    <input
+                      type="file"
+                      ref={multiFileInputRef}
+                      accept="image/*"
+                      multiple
+                      onChange={handleMultipleImageUpload}
+                      className="hidden"
+                      id="multi-photo-upload"
+                    />
+
+                    {/* Upload Drop Zone */}
+                    <div className="bg-white border-2 border-dashed border-[#2C2621]/20 rounded-2xl p-4 sm:p-5 text-center hover:border-[#1E1B18] transition-all">
+                      <div className="flex flex-col items-center justify-center">
+                        <div className="w-10 h-10 rounded-full bg-[#EDE5DC] text-[#1E1B18] flex items-center justify-center mb-2">
+                          <UploadCloud className="w-5 h-5" />
+                        </div>
+
+                        <label
+                          htmlFor="multi-photo-upload"
+                          className="cursor-pointer px-4 py-2 bg-[#1E1B18] hover:bg-[#8C6D46] text-white rounded-full text-[10px] tracking-wider uppercase font-semibold transition-all shadow-xs"
                         >
-                          <Image
-                            src={url}
-                            alt={`Photo ${idx + 1}`}
-                            fill
-                            className="object-cover pointer-events-none"
-                          />
+                          {isUploading
+                            ? "Uploading photos..."
+                            : "Choose Photos from Device"}
+                        </label>
 
-                          {/* Quick reorder controls (visible directly on mobile, on hover for desktop) */}
-                          <div className="absolute inset-0 bg-black/45 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex flex-col justify-between p-1">
-                            <div className="flex justify-between items-center">
-                              {idx > 0 ? (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    makeCover(idx);
-                                  }}
-                                  className="px-1.5 py-0.5 rounded bg-[#C99742] text-[#1E1B18] text-[7px] font-bold uppercase tracking-wider shadow"
-                                  title="Make this the Cover image"
-                                >
-                                  ★ Cover
-                                </button>
-                              ) : (
-                                <span className="px-1.5 py-0.5 rounded bg-[#1E1B18] text-[#FAF7F2] text-[7px] font-bold uppercase tracking-wider">
-                                  Cover
-                                </span>
-                              )}
+                        <p className="text-[10px] text-[#8C7A6B] mt-2">
+                          Select multiple photos at once · PNG, JPG, WEBP · Works on mobile &amp; laptop
+                        </p>
+                      </div>
+                    </div>
 
-                              {/* Remove button */}
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  removeImage(url);
-                                }}
-                                className="w-4 h-4 rounded-full bg-[#992222] text-white text-[8px] flex items-center justify-center font-bold leading-none shadow"
-                                title="Remove photo"
-                              >
-                                ✕
-                              </button>
-                            </div>
-
-                            {/* Arrow buttons for mobile & quick repositioning */}
-                            <div className="flex justify-center gap-1">
-                              {idx > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    moveImage(idx, idx - 1);
-                                  }}
-                                  className="px-1.5 py-0.5 rounded bg-white/95 text-[#1E1B18] text-[8px] font-bold hover:bg-white shadow"
-                                  title="Move Left"
-                                >
-                                  ◀
-                                </button>
-                              )}
-                              {idx < formData.images.length - 1 && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    moveImage(idx, idx + 1);
-                                  }}
-                                  className="px-1.5 py-0.5 rounded bg-white/95 text-[#1E1B18] text-[8px] font-bold hover:bg-white shadow"
-                                  title="Move Right"
-                                >
-                                  ▶
-                                </button>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Default Badge */}
-                          <span
-                            className={`absolute bottom-0 left-0 right-0 text-center text-[7px] font-bold uppercase tracking-wider py-0.5 opacity-0 sm:opacity-100 sm:group-hover:opacity-0 transition-opacity ${
-                              idx === 0
-                                ? "bg-[#1E1B18] text-[#C99742]"
-                                : idx === 1
-                                ? "bg-[#2C2621]/80 text-white"
-                                : "bg-black/60 text-white"
-                            }`}
-                          >
-                            {idx === 0 ? "★ COVER" : idx === 1 ? "Detail" : `#${idx + 1}`}
+                    {/* Uploaded Images Strip */}
+                    {formData.images.length > 0 && (
+                      <div className="mt-3">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-[9px] tracking-wider uppercase text-[#8C7A6B] font-semibold block">
+                            {formData.images.length} Photo{formData.images.length > 1 ? "s" : ""} — Drag or click &quot;Make Cover&quot; to reorder
+                          </span>
+                          <span className="text-[8px] text-[#8C6D46] uppercase font-medium">
+                            First image = Cover
                           </span>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
-                {/* Fallback: single image preview when no images[] uploaded */}
-                {formData.images.length === 0 && (
-                  <div className="mt-3 flex items-center gap-3 bg-[#EDE5DC]/60 p-2.5 rounded-xl border border-[#2C2621]/10">
-                    <div className="relative w-12 h-14 rounded-lg overflow-hidden bg-white shrink-0 border border-[#2C2621]/15 flex items-center justify-center">
-                    {formData.image ? (
-                      <Image
-                        src={formData.image}
-                        alt="Active preview"
-                        fill
-                        className="object-cover"
-                      />
-                    ) : (
-                      <Camera className="w-5 h-5 text-[#8C7A6B]/50" />
+                        <div className="flex gap-2.5 overflow-x-auto pb-2 pt-1 scrollbar-none">
+                          {formData.images.map((url, idx) => (
+                            <div
+                              key={url}
+                              draggable
+                              onDragStart={() => setDraggedIndex(idx)}
+                              onDragOver={(e) => e.preventDefault()}
+                              onDrop={() => {
+                                if (draggedIndex !== null && draggedIndex !== idx) {
+                                  moveImage(draggedIndex, idx);
+                                  setDraggedIndex(null);
+                                }
+                              }}
+                              className={`relative shrink-0 w-20 h-24 rounded-xl overflow-hidden border-2 transition-all cursor-grab active:cursor-grabbing group ${
+                                idx === 0
+                                  ? "border-[#1E1B18] shadow-sm ring-2 ring-[#C99742]/40"
+                                  : "border-[#2C2621]/15 hover:border-[#1E1B18]"
+                              }`}
+                            >
+                              <Image
+                                src={url}
+                                alt={`Photo ${idx + 1}`}
+                                fill
+                                className="object-cover pointer-events-none"
+                              />
+
+                              {/* Quick reorder controls */}
+                              <div className="absolute inset-0 bg-black/45 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex flex-col justify-between p-1">
+                                <div className="flex justify-between items-center">
+                                  {idx > 0 ? (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        makeCover(idx);
+                                      }}
+                                      className="px-1.5 py-0.5 rounded bg-[#C99742] text-[#1E1B18] text-[7px] font-bold uppercase tracking-wider shadow"
+                                      title="Make this the Cover image"
+                                    >
+                                      ★ Cover
+                                    </button>
+                                  ) : (
+                                    <span className="px-1.5 py-0.5 rounded bg-[#1E1B18] text-[#FAF7F2] text-[7px] font-bold uppercase tracking-wider">
+                                      Cover
+                                    </span>
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      removeImage(url);
+                                    }}
+                                    className="w-4 h-4 rounded-full bg-[#992222] text-white text-[8px] flex items-center justify-center font-bold leading-none shadow"
+                                    title="Remove photo"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+
+                                <div className="flex justify-center gap-1">
+                                  {idx > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        moveImage(idx, idx - 1);
+                                      }}
+                                      className="px-1.5 py-0.5 rounded bg-white/95 text-[#1E1B18] text-[8px] font-bold hover:bg-white shadow"
+                                      title="Move Left"
+                                    >
+                                      ◀
+                                    </button>
+                                  )}
+                                  {idx < formData.images.length - 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        moveImage(idx, idx + 1);
+                                      }}
+                                      className="px-1.5 py-0.5 rounded bg-white/95 text-[#1E1B18] text-[8px] font-bold hover:bg-white shadow"
+                                      title="Move Right"
+                                    >
+                                      ▶
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              <span
+                                className={`absolute bottom-0 left-0 right-0 text-center text-[7px] font-bold uppercase tracking-wider py-0.5 opacity-0 sm:opacity-100 sm:group-hover:opacity-0 transition-opacity ${
+                                  idx === 0
+                                    ? "bg-[#1E1B18] text-[#C99742]"
+                                    : idx === 1
+                                    ? "bg-[#2C2621]/80 text-white"
+                                    : "bg-black/60 text-white"
+                                }`}
+                              >
+                                {idx === 0 ? "★ COVER" : idx === 1 ? "Detail" : `#${idx + 1}`}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Fallback preview when no images[] */}
+                    {formData.images.length === 0 && (
+                      <div className="mt-3 flex items-center gap-3 bg-[#EDE5DC]/60 p-2.5 rounded-xl border border-[#2C2621]/10">
+                        <div className="relative w-12 h-14 rounded-lg overflow-hidden bg-white shrink-0 border border-[#2C2621]/15 flex items-center justify-center">
+                          {formData.image ? (
+                            <Image
+                              src={formData.image}
+                              alt="Active preview"
+                              fill
+                              className="object-cover"
+                            />
+                          ) : (
+                            <Camera className="w-5 h-5 text-[#8C7A6B]/50" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[9px] tracking-wider uppercase text-[#8C7A6B] block">
+                            CURRENT PHOTO
+                          </span>
+                          <p className="text-[10px] text-[#1E1B18] truncate font-medium">
+                            {formData.image.startsWith("http")
+                              ? "Stored in Supabase Cloud ✓"
+                              : formData.image
+                              ? "Photo chosen ✓"
+                              : "No photo chosen — upload from your device above"}
+                          </p>
+                        </div>
+                      </div>
                     )}
                   </div>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-[9px] tracking-wider uppercase text-[#8C7A6B] block">
-                        CURRENT PHOTO
-                      </span>
-                      <p className="text-[10px] text-[#1E1B18] truncate font-medium">
-                        {formData.image.startsWith("http")
-                          ? "Stored in Supabase Cloud ✓"
-                          : formData.image
-                          ? "Photo chosen ✓"
-                          : "No photo chosen — upload from your device above"}
-                      </p>
-                    </div>
-                  </div>
                 )}
 
-                {/* 2B. COLORWAYS & VARIANTS (OPTIONAL) */}
-                <div className="mt-5 pt-4 border-t border-[#2C2621]/10">
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <h5 className="text-[11px] tracking-[0.18em] uppercase font-semibold text-[#8C6D46] flex items-center gap-1.5">
-                        <Palette className="w-3.5 h-3.5" />
-                        <span>COLORWAYS &amp; VARIANTS (OPTIONAL)</span>
-                      </h5>
-                      <p className="text-[10px] text-[#736555] mt-0.5">
-                        Does this piece have other colors? Add colorways (e.g. Noir, Cream, Olive) and upload their dedicated photos below.
+                {/* ── BRANCH B: MULTIPLE COLORWAYS ONLY ── */}
+                {colorMode === "variants" && (
+                  <div>
+                    <div className="mb-3">
+                      <p className="text-[10px] text-[#736555]">
+                        Add each colorway for this piece (e.g. Hazel nut, Noir, Emerald). Upload dedicated photos for each color.
+                        The first photo of <strong>Colorway #1</strong> will automatically serve as the storefront catalog cover.
                       </p>
                     </div>
-                  </div>
 
-                  {/* Add New Colorway Input Card */}
-                  <div className="bg-white p-3 rounded-xl border border-[#2C2621]/15 mb-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                      <div className="flex-1">
-                        <label className="text-[9px] uppercase tracking-wider text-[#8C7A6B] font-semibold block mb-1">
-                          Colorway Name
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Hazel nut, Emerald Green, Burgundy, Ivory"
-                          value={newColorName}
-                          onChange={(e) => handleColorNameChange(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              handleAddColorVariant();
-                            }
-                          }}
-                          className="w-full bg-[#EDE5DC]/40 border border-[#2C2621]/20 rounded-lg px-3 py-1.5 text-xs text-[#1E1B18] placeholder:text-[#8C7A6B] focus:outline-none focus:border-[#1E1B18]"
-                        />
-
-                        {/* Live Color Recognition Indicator */}
-                        {newColorName.trim() && resolveColorNameToHex(newColorName) && (
-                          <div className="flex items-center gap-1.5 mt-1 text-[9px] text-[#2A4D33] font-semibold">
-                            <span
-                              className="w-2.5 h-2.5 rounded-full border border-black/20 shadow-xs shrink-0"
-                              style={{ backgroundColor: newColorHex }}
-                            />
-                            <span>Recognized shade ({newColorHex}) — color swatch updated!</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="w-32 shrink-0">
-                        <label className="text-[9px] uppercase tracking-wider text-[#8C7A6B] font-semibold block mb-1">
-                          Swatch Color
-                        </label>
-                        <div className="flex items-center gap-2 bg-[#EDE5DC]/40 border border-[#2C2621]/20 rounded-lg px-2 py-1">
+                    {/* Add New Colorway Input Card */}
+                    <div className="bg-white p-3.5 rounded-xl border border-[#2C2621]/15 mb-4 shadow-xs">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
+                        <div className="flex-1">
+                          <label className="text-[9px] uppercase tracking-wider text-[#8C7A6B] font-semibold block mb-1">
+                            Colorway Name
+                          </label>
                           <input
-                            type="color"
-                            value={newColorHex}
-                            onChange={(e) => setNewColorHex(e.target.value)}
-                            className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent p-0"
-                            title="Fine-tune swatch color"
+                            type="text"
+                            placeholder="e.g. Hazel nut, Emerald, Noir, Burgundy, Champagne"
+                            value={newColorName}
+                            onChange={(e) => handleColorNameChange(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleAddColorVariant();
+                              }
+                            }}
+                            className="w-full bg-[#EDE5DC]/40 border border-[#2C2621]/20 rounded-lg px-3 py-1.5 text-xs text-[#1E1B18] placeholder:text-[#8C7A6B] focus:outline-none focus:border-[#1E1B18]"
                           />
-                          <span className="text-[10px] font-mono text-[#5C4D3C] uppercase truncate">
-                            {newColorHex}
-                          </span>
+
+                          {/* Live Color Recognition Indicator */}
+                          {newColorName.trim() && resolveColorNameToHex(newColorName) && (
+                            <div className="flex items-center gap-1.5 mt-1 text-[9px] text-[#2A4D33] font-semibold">
+                              <span
+                                className="w-2.5 h-2.5 rounded-full border border-black/20 shadow-xs shrink-0"
+                                style={{ backgroundColor: newColorHex }}
+                              />
+                              <span>Recognized shade ({newColorHex}) — color swatch matched!</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="w-32 shrink-0">
+                          <label className="text-[9px] uppercase tracking-wider text-[#8C7A6B] font-semibold block mb-1">
+                            Swatch Color
+                          </label>
+                          <div className="flex items-center gap-2 bg-[#EDE5DC]/40 border border-[#2C2621]/20 rounded-lg px-2 py-1">
+                            <input
+                              type="color"
+                              value={newColorHex}
+                              onChange={(e) => setNewColorHex(e.target.value)}
+                              className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent p-0"
+                              title="Fine-tune swatch color"
+                            />
+                            <span className="text-[10px] font-mono text-[#5C4D3C] uppercase truncate">
+                              {newColorHex}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="sm:self-end">
+                          <button
+                            type="button"
+                            onClick={handleAddColorVariant}
+                            className="w-full sm:w-auto px-4 py-2 bg-[#1E1B18] hover:bg-[#8C6D46] text-[#FAF7F2] rounded-lg text-[10px] tracking-wider uppercase font-semibold transition-all flex items-center justify-center gap-1 shadow-xs"
+                          >
+                            <Plus className="w-3 h-3" />
+                            <span>Add Colorway</span>
+                          </button>
                         </div>
                       </div>
 
-                      <div className="sm:self-end">
-                        <button
-                          type="button"
-                          onClick={handleAddColorVariant}
-                          className="w-full sm:w-auto px-4 py-2 bg-[#1E1B18] hover:bg-[#8C6D46] text-[#FAF7F2] rounded-lg text-[10px] tracking-wider uppercase font-semibold transition-all flex items-center justify-center gap-1 shadow-xs"
-                        >
-                          <Plus className="w-3 h-3" />
-                          <span>Add Color</span>
-                        </button>
+                      {/* Quick-Pick Popular Fashion Palette */}
+                      <div className="mt-2.5 pt-2 border-t border-[#2C2621]/10">
+                        <span className="text-[8.5px] uppercase tracking-wider text-[#8C7A6B] block mb-1 font-medium">
+                          Quick-Select Popular Atelier Shades:
+                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {[
+                            { name: "Hazel nut", hex: "#A87B51" },
+                            { name: "Burgundy", hex: "#800020" },
+                            { name: "Emerald", hex: "#097969" },
+                            { name: "Champagne", hex: "#F7E7CE" },
+                            { name: "Noir", hex: "#111111" },
+                            { name: "Cream", hex: "#FFFDD0" },
+                            { name: "Caramel", hex: "#C68B59" },
+                            { name: "Mocha", hex: "#967969" },
+                            { name: "Olive", hex: "#556B2F" },
+                            { name: "Terracotta", hex: "#E2725B" },
+                          ].map((shade) => (
+                            <button
+                              key={shade.name}
+                              type="button"
+                              onClick={() => {
+                                setNewColorName(shade.name);
+                                setNewColorHex(shade.hex);
+                              }}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8.5px] uppercase tracking-wider font-semibold bg-[#EDE5DC]/60 hover:bg-[#1E1B18] hover:text-white border border-[#2C2621]/15 text-[#5C4D3C] transition-all"
+                            >
+                              <span
+                                className="w-2 h-2 rounded-full border border-black/20 shrink-0"
+                                style={{ backgroundColor: shade.hex }}
+                              />
+                              <span>{shade.name}</span>
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
 
-                    {/* Quick-Pick Popular Fashion Palette */}
-                    <div className="mt-2.5 pt-2 border-t border-[#2C2621]/10">
-                      <span className="text-[8.5px] uppercase tracking-wider text-[#8C7A6B] block mb-1 font-medium">
-                        Quick-Select Popular Atelier Shades:
-                      </span>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {[
-                          { name: "Hazel nut", hex: "#A87B51" },
-                          { name: "Burgundy", hex: "#800020" },
-                          { name: "Emerald", hex: "#097969" },
-                          { name: "Champagne", hex: "#F7E7CE" },
-                          { name: "Noir", hex: "#111111" },
-                          { name: "Cream", hex: "#FFFDD0" },
-                          { name: "Caramel", hex: "#C68B59" },
-                          { name: "Mocha", hex: "#967969" },
-                          { name: "Olive", hex: "#556B2F" },
-                          { name: "Terracotta", hex: "#E2725B" },
-                        ].map((shade) => (
-                          <button
-                            key={shade.name}
-                            type="button"
-                            onClick={() => {
-                              setNewColorName(shade.name);
-                              setNewColorHex(shade.hex);
-                            }}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8.5px] uppercase tracking-wider font-semibold bg-[#EDE5DC]/60 hover:bg-[#1E1B18] hover:text-white border border-[#2C2621]/15 text-[#5C4D3C] transition-all"
+                    {/* List of Added Colorways */}
+                    {formData.colorVariants.length === 0 ? (
+                      <div className="p-4 rounded-xl border border-dashed border-[#2C2621]/20 bg-white/60 text-center">
+                        <Palette className="w-6 h-6 text-[#8C7A6B]/50 mx-auto mb-1.5" />
+                        <p className="text-xs font-serif uppercase tracking-wider text-[#1E1B18]">
+                          No Colorways Added Yet
+                        </p>
+                        <p className="text-[10px] text-[#8C7A6B] mt-0.5">
+                          Type a color name above (e.g. &ldquo;Hazel nut&rdquo;) and click <strong>Add Colorway</strong>.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {formData.colorVariants.map((cv, vIdx) => (
+                          <div
+                            key={cv.name + vIdx}
+                            className={`bg-white rounded-xl p-3.5 border transition-all ${
+                              vIdx === 0
+                                ? "border-[#C99742] ring-1 ring-[#C99742]/30 shadow-xs"
+                                : "border-[#2C2621]/15"
+                            }`}
                           >
-                            <span
-                              className="w-2 h-2 rounded-full border border-black/20 shrink-0"
-                              style={{ backgroundColor: shade.hex }}
-                            />
-                            <span>{shade.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                            {/* Colorway Header */}
+                            <div className="flex items-center justify-between pb-2 border-b border-[#2C2621]/10 gap-2 flex-wrap">
+                              <div className="flex items-center gap-2">
+                                {cv.hex && (
+                                  <span
+                                    className="w-4 h-4 rounded-full border border-black/20 shrink-0 shadow-xs"
+                                    style={{ backgroundColor: cv.hex }}
+                                  />
+                                )}
+                                <span className="font-serif text-sm uppercase font-semibold text-[#1E1B18]">
+                                  {cv.name}
+                                </span>
+                                {vIdx === 0 ? (
+                                  <span className="px-2 py-0.5 rounded-full bg-[#1E1B18] text-[#C99742] text-[8px] font-bold uppercase tracking-wider">
+                                    ★ Cover Colorway
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => moveColorVariant(vIdx, 0)}
+                                    className="text-[8px] uppercase tracking-wider text-[#8C6D46] hover:text-[#1E1B18] font-bold underline"
+                                    title="Make this colorway the lead cover for catalog"
+                                  >
+                                    Set as Cover
+                                  </button>
+                                )}
+                                <span className="text-[9px] text-[#8C7A6B]">
+                                  ({cv.images.length} photo{cv.images.length === 1 ? "" : "s"})
+                                </span>
+                              </div>
 
-                  {/* List of Added Colorways */}
-                  {formData.colorVariants.length > 0 && (
-                    <div className="space-y-3">
-                      {formData.colorVariants.map((cv, vIdx) => (
-                        <div
-                          key={cv.name + vIdx}
-                          className="bg-white rounded-xl p-3 border border-[#2C2621]/15 shadow-xs"
-                        >
-                          <div className="flex items-center justify-between pb-2 border-b border-[#2C2621]/10">
-                            <div className="flex items-center gap-2">
-                              {cv.hex && (
-                                <span
-                                  className="w-4 h-4 rounded-full border border-black/20 shrink-0"
-                                  style={{ backgroundColor: cv.hex }}
-                                />
-                              )}
-                              <span className="font-serif text-xs uppercase font-semibold text-[#1E1B18]">
-                                {cv.name}
-                              </span>
-                              <span className="text-[9px] text-[#8C7A6B]">
-                                ({cv.images.length} photo{cv.images.length === 1 ? "" : "s"})
-                              </span>
+                              <div className="flex items-center gap-2">
+                                {vIdx > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => moveColorVariant(vIdx, vIdx - 1)}
+                                    className="px-1.5 py-0.5 rounded bg-[#EDE5DC] hover:bg-[#1E1B18] hover:text-white text-[#1E1B18] text-[8px] font-bold uppercase tracking-wider"
+                                    title="Move Colorway Up"
+                                  >
+                                    ▲ Up
+                                  </button>
+                                )}
+                                {vIdx < formData.colorVariants.length - 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => moveColorVariant(vIdx, vIdx + 1)}
+                                    className="px-1.5 py-0.5 rounded bg-[#EDE5DC] hover:bg-[#1E1B18] hover:text-white text-[#1E1B18] text-[8px] font-bold uppercase tracking-wider"
+                                    title="Move Colorway Down"
+                                  >
+                                    ▼ Down
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveColorVariant(vIdx)}
+                                  className="text-[#8C7A6B] hover:text-[#992222] text-[10px] uppercase tracking-wider font-semibold flex items-center gap-1"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                  <span>Remove</span>
+                                </button>
+                              </div>
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveColorVariant(vIdx)}
-                              className="text-[#8C7A6B] hover:text-[#992222] text-[10px] uppercase tracking-wider font-semibold flex items-center gap-1"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                              <span>Remove</span>
-                            </button>
-                          </div>
-
-                          {/* Upload Photos for this Colorway */}
-                          <div className="mt-2.5">
-                            <span className="text-[9px] uppercase tracking-wider text-[#8C7A6B] block mb-1.5 font-medium">
-                              Photos for {cv.name}:
-                            </span>
-
-                            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-                              {/* Hidden file input */}
-                              <label className="relative shrink-0 w-16 h-20 rounded-lg border-2 border-dashed border-[#2C2621]/20 hover:border-[#1E1B18] bg-[#EDE5DC]/40 flex flex-col items-center justify-center cursor-pointer transition-all">
+                            {/* Colorway Upload Controls & Photo Strip */}
+                            <div className="mt-2.5">
+                              {/* Upload Button */}
+                              <div className="flex items-center gap-2 mb-2">
                                 <input
                                   type="file"
+                                  id={`variant-upload-${vIdx}`}
                                   accept="image/*"
                                   multiple
                                   onChange={(e) => handleVariantImageUpload(vIdx, e)}
                                   className="hidden"
                                 />
-                                <Camera className="w-4 h-4 text-[#8C7A6B] mb-0.5" />
-                                <span className="text-[7.5px] uppercase tracking-wider font-semibold text-[#5C4D3C] text-center px-1">
-                                  {variantUploadingIdx === vIdx ? "..." : "+ Photo"}
-                                </span>
-                              </label>
-
-                              {cv.images.map((imgUrl, imgIdx) => (
-                                <div
-                                  key={imgUrl + imgIdx}
-                                  className="relative shrink-0 w-16 h-20 rounded-lg overflow-hidden border border-[#2C2621]/15 group"
+                                <label
+                                  htmlFor={`variant-upload-${vIdx}`}
+                                  className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#1E1B18] hover:bg-[#8C6D46] text-white rounded-full text-[9px] uppercase tracking-wider font-semibold transition-all shadow-xs"
                                 >
-                                  <Image
-                                    src={imgUrl}
-                                    alt={`${cv.name} photo ${imgIdx + 1}`}
-                                    fill
-                                    className="object-cover"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveVariantImage(vIdx, imgUrl)}
-                                    className="absolute top-1 right-1 w-4 h-4 rounded-full bg-[#992222] text-white text-[8px] flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity font-bold"
-                                    title="Remove photo"
-                                  >
-                                    ✕
-                                  </button>
-                                  {imgIdx === 0 && (
-                                    <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[6.5px] uppercase text-center font-bold py-0.5">
-                                      Lead
-                                    </span>
-                                  )}
+                                  <UploadCloud className="w-3 h-3" />
+                                  <span>
+                                    {variantUploadingIdx === vIdx
+                                      ? "Uploading photos..."
+                                      : `+ Upload Photos for ${cv.name}`}
+                                  </span>
+                                </label>
+                                <span className="text-[9px] text-[#8C7A6B]">
+                                  PNG, JPG, WEBP from device
+                                </span>
+                              </div>
+
+                              {/* Photo Thumbnails Strip for this colorway */}
+                              {cv.images.length > 0 ? (
+                                <div className="flex gap-2 overflow-x-auto pb-1 pt-1 scrollbar-none">
+                                  {cv.images.map((imgUrl, imgIdx) => (
+                                    <div
+                                      key={imgUrl + imgIdx}
+                                      className={`relative shrink-0 w-16 h-20 rounded-lg overflow-hidden border-2 group ${
+                                        vIdx === 0 && imgIdx === 0
+                                          ? "border-[#C99742] ring-2 ring-[#C99742]/40"
+                                          : "border-[#2C2621]/15"
+                                      }`}
+                                    >
+                                      <Image
+                                        src={imgUrl}
+                                        alt={`${cv.name} ${imgIdx + 1}`}
+                                        fill
+                                        className="object-cover"
+                                      />
+
+                                      {/* Hover/Tap actions */}
+                                      <div className="absolute inset-0 bg-black/45 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex flex-col justify-between p-1">
+                                        <div className="flex justify-between items-center">
+                                          {vIdx === 0 && imgIdx === 0 ? (
+                                            <span className="px-1 py-0.5 rounded bg-[#C99742] text-[#1E1B18] text-[6.5px] font-bold uppercase tracking-wider">
+                                              ★ Cover
+                                            </span>
+                                          ) : (
+                                            <span className="text-[6.5px] text-white font-medium">
+                                              #{imgIdx + 1}
+                                            </span>
+                                          )}
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRemoveVariantImage(vIdx, imgUrl)}
+                                            className="w-4 h-4 rounded-full bg-[#992222] text-white text-[8px] flex items-center justify-center font-bold"
+                                            title="Remove photo"
+                                          >
+                                            ✕
+                                          </button>
+                                        </div>
+
+                                        {/* Reorder within colorway */}
+                                        <div className="flex justify-center gap-1">
+                                          {imgIdx > 0 && (
+                                            <button
+                                              type="button"
+                                              onClick={() => moveVariantImage(vIdx, imgIdx, imgIdx - 1)}
+                                              className="px-1 py-0.5 rounded bg-white text-[#1E1B18] text-[7px] font-bold"
+                                              title="Move left"
+                                            >
+                                              ◀
+                                            </button>
+                                          )}
+                                          {imgIdx < cv.images.length - 1 && (
+                                            <button
+                                              type="button"
+                                              onClick={() => moveVariantImage(vIdx, imgIdx, imgIdx + 1)}
+                                              className="px-1 py-0.5 rounded bg-white text-[#1E1B18] text-[7px] font-bold"
+                                              title="Move right"
+                                            >
+                                              ▶
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {vIdx === 0 && imgIdx === 0 && (
+                                        <span className="absolute bottom-0 left-0 right-0 bg-[#1E1B18] text-[#C99742] text-[6.5px] font-bold uppercase text-center py-0.5">
+                                          ★ COVER
+                                        </span>
+                                      )}
+                                    </div>
+                                  ))}
                                 </div>
-                              ))}
+                              ) : (
+                                <p className="text-[10px] text-[#8C7A6B] italic">
+                                  No photos uploaded for this color yet. Click &quot;+ Upload Photos&quot; above.
+                                </p>
+                              )}
                             </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* SECTION 3: THEME & CATEGORY */}
