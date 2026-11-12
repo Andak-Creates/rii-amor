@@ -466,40 +466,60 @@ export async function uploadImageToSupabaseStorage(
     };
   }
 
-  try {
-    const bucket = "product-images";
-    const uploadUrl = `${SUPABASE_URL}/storage/v1/object/${bucket}/${encodeURIComponent(filename)}`;
+  const bucket = "product-images";
+  const uploadUrl = `${SUPABASE_URL}/storage/v1/object/${bucket}/${encodeURIComponent(filename)}`;
+  const uint8 = fileBuffer instanceof Buffer ? new Uint8Array(fileBuffer) : new Uint8Array(fileBuffer);
+  const mime = contentType || "image/jpeg";
 
-    const res = await fetch(uploadUrl, {
-      method: "POST",
-      headers: {
-        apikey: SERVICE_KEY,
-        Authorization: `Bearer ${SERVICE_KEY}`,
-        "Content-Type": contentType || "image/jpeg",
-        "x-upsert": "true",
-      },
-      body: fileBuffer as unknown as BodyInit,
-    });
+  // Retry up to 3 times to recover from transient socket drops / Cloudflare keep-alive resets
+  const maxAttempts = 3;
+  let lastErrorMessage = "Unknown upload error";
 
-    if (res.ok) {
-      return {
-        url: `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${encodeURIComponent(filename)}`,
-      };
-    } else {
-      const err = await res.text();
-      console.error("Supabase storage upload error:", res.status, err);
-      return {
-        url: null,
-        error: `Supabase Storage error (${res.status}): ${err}`,
-      };
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch(uploadUrl, {
+        method: "POST",
+        headers: {
+          apikey: SERVICE_KEY,
+          Authorization: `Bearer ${SERVICE_KEY}`,
+          "Content-Type": mime,
+          "Content-Length": String(uint8.byteLength),
+          "x-upsert": "true",
+          Connection: attempt > 1 ? "close" : "keep-alive",
+        },
+        body: uint8,
+        // @ts-expect-error duplex is required in Node fetch for binary uploads
+        duplex: "half",
+      });
+
+      if (res.ok) {
+        return {
+          url: `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${encodeURIComponent(filename)}`,
+        };
+      } else {
+        const errText = await res.text();
+        console.error(`Supabase storage upload error (attempt ${attempt}):`, res.status, errText);
+        lastErrorMessage = `Supabase Storage error (${res.status}): ${errText}`;
+        if (res.status === 400 || res.status === 401 || res.status === 403) {
+          // Authentication or validation errors should not retry
+          break;
+        }
+      }
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      lastErrorMessage = err.message;
+      console.warn(`Supabase storage upload socket drop on attempt ${attempt}:`, err.message);
+      if (attempt < maxAttempts) {
+        // Wait briefly before retrying with a fresh socket connection
+        await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+      }
     }
-  } catch (error) {
-    console.error("Supabase storage exception:", error);
-    return {
-      url: null,
-      error: error instanceof Error ? error.message : "Unknown upload error",
-    };
   }
+
+  return {
+    url: null,
+    error: lastErrorMessage,
+  };
 }
 
 // ── ORDERS PERSISTENCE IN SUPABASE ──────────────────────────────────────

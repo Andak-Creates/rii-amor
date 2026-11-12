@@ -172,6 +172,7 @@ export default function AdminPage() {
                 src="/images/logo-transparent.png"
                 alt="Rii Amor"
                 fill
+                sizes="64px"
                 className="object-contain"
                 priority
               />
@@ -895,6 +896,7 @@ export default function AdminPage() {
                 src="/images/logo-transparent.png"
                 alt="Rii Amor Logo"
                 fill
+                sizes="32px"
                 className="object-contain"
                 priority
               />
@@ -1146,6 +1148,7 @@ export default function AdminPage() {
                                   src={item.productImage}
                                   alt={item.productName}
                                   fill
+                                  sizes="48px"
                                   className="object-cover"
                                 />
                               ) : (
@@ -1450,6 +1453,7 @@ export default function AdminPage() {
                                 src={url}
                                 alt={`Photo ${idx + 1}`}
                                 fill
+                                sizes="80px"
                                 className="object-cover pointer-events-none"
                               />
 
@@ -1543,6 +1547,7 @@ export default function AdminPage() {
                               src={formData.image}
                               alt="Active preview"
                               fill
+                              sizes="48px"
                               className="object-cover"
                             />
                           ) : (
@@ -1723,6 +1728,7 @@ export default function AdminPage() {
                                     src={url}
                                     alt={`Preview ${idx + 1}`}
                                     fill
+                                    sizes="64px"
                                     className="object-cover"
                                   />
                                   <button
@@ -1893,6 +1899,7 @@ export default function AdminPage() {
                                         src={imgUrl}
                                         alt={`${cv.name} ${imgIdx + 1}`}
                                         fill
+                                        sizes="64px"
                                         className="object-cover"
                                       />
 
@@ -2221,6 +2228,7 @@ export default function AdminPage() {
                       src={livePreviewProduct.image}
                       alt={livePreviewProduct.name}
                       fill
+                      sizes="(max-width: 768px) 100vw, 320px"
                       className="object-cover"
                     />
                   ) : (
@@ -2282,6 +2290,7 @@ export default function AdminPage() {
                       src={livePreviewProduct.image}
                       alt="Dossier"
                       fill
+                      sizes="(max-width: 768px) 100vw, 320px"
                       className="object-cover object-top"
                     />
                   ) : (
@@ -2348,6 +2357,7 @@ export default function AdminPage() {
                           src={p.image}
                           alt={p.name}
                           fill
+                          sizes="48px"
                           className="object-cover"
                         />
                       ) : (
