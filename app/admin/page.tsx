@@ -21,6 +21,7 @@ import {
   Palette,
 } from "lucide-react";
 import { Product, ColorVariant, Order } from "@/data/products";
+import { resolveColorNameToHex } from "@/lib/colors";
 import {
   formatNaira,
   formatNumberWithCommas,
@@ -440,9 +441,17 @@ export default function AdminPage() {
   };
 
   // Color Variant handlers
+  const handleColorNameChange = (val: string) => {
+    setNewColorName(val);
+    const matched = resolveColorNameToHex(val);
+    if (matched) {
+      setNewColorHex(matched);
+    }
+  };
+
   const handleAddColorVariant = () => {
     if (!newColorName.trim()) {
-      showNotification("error", "Please enter a color name (e.g. Noir, Emerald)");
+      showNotification("error", "Please enter a color name (e.g. Hazel nut, Noir, Emerald)");
       return;
     }
     const exists = formData.colorVariants.some(
@@ -453,13 +462,15 @@ export default function AdminPage() {
       return;
     }
 
+    const resolvedHex = resolveColorNameToHex(newColorName.trim()) || newColorHex;
+
     setFormData((prev) => ({
       ...prev,
       colorVariants: [
         ...prev.colorVariants,
         {
           name: newColorName.trim(),
-          hex: newColorHex,
+          hex: resolvedHex,
           images: [],
         },
       ],
@@ -1315,9 +1326,9 @@ export default function AdminPage() {
                         </label>
                         <input
                           type="text"
-                          placeholder="e.g. Emerald Green, Jet Black, Ivory"
+                          placeholder="e.g. Hazel nut, Emerald Green, Burgundy, Ivory"
                           value={newColorName}
-                          onChange={(e) => setNewColorName(e.target.value)}
+                          onChange={(e) => handleColorNameChange(e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
                               e.preventDefault();
@@ -1326,6 +1337,17 @@ export default function AdminPage() {
                           }}
                           className="w-full bg-[#EDE5DC]/40 border border-[#2C2621]/20 rounded-lg px-3 py-1.5 text-xs text-[#1E1B18] placeholder:text-[#8C7A6B] focus:outline-none focus:border-[#1E1B18]"
                         />
+
+                        {/* Live Color Recognition Indicator */}
+                        {newColorName.trim() && resolveColorNameToHex(newColorName) && (
+                          <div className="flex items-center gap-1.5 mt-1 text-[9px] text-[#2A4D33] font-semibold">
+                            <span
+                              className="w-2.5 h-2.5 rounded-full border border-black/20 shadow-xs shrink-0"
+                              style={{ backgroundColor: newColorHex }}
+                            />
+                            <span>Recognized shade ({newColorHex}) — color swatch updated!</span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="w-32 shrink-0">
@@ -1338,7 +1360,7 @@ export default function AdminPage() {
                             value={newColorHex}
                             onChange={(e) => setNewColorHex(e.target.value)}
                             className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent p-0"
-                            title="Pick swatch color"
+                            title="Fine-tune swatch color"
                           />
                           <span className="text-[10px] font-mono text-[#5C4D3C] uppercase truncate">
                             {newColorHex}
@@ -1355,6 +1377,43 @@ export default function AdminPage() {
                           <Plus className="w-3 h-3" />
                           <span>Add Color</span>
                         </button>
+                      </div>
+                    </div>
+
+                    {/* Quick-Pick Popular Fashion Palette */}
+                    <div className="mt-2.5 pt-2 border-t border-[#2C2621]/10">
+                      <span className="text-[8.5px] uppercase tracking-wider text-[#8C7A6B] block mb-1 font-medium">
+                        Quick-Select Popular Atelier Shades:
+                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {[
+                          { name: "Hazel nut", hex: "#A87B51" },
+                          { name: "Burgundy", hex: "#800020" },
+                          { name: "Emerald", hex: "#097969" },
+                          { name: "Champagne", hex: "#F7E7CE" },
+                          { name: "Noir", hex: "#111111" },
+                          { name: "Cream", hex: "#FFFDD0" },
+                          { name: "Caramel", hex: "#C68B59" },
+                          { name: "Mocha", hex: "#967969" },
+                          { name: "Olive", hex: "#556B2F" },
+                          { name: "Terracotta", hex: "#E2725B" },
+                        ].map((shade) => (
+                          <button
+                            key={shade.name}
+                            type="button"
+                            onClick={() => {
+                              setNewColorName(shade.name);
+                              setNewColorHex(shade.hex);
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8.5px] uppercase tracking-wider font-semibold bg-[#EDE5DC]/60 hover:bg-[#1E1B18] hover:text-white border border-[#2C2621]/15 text-[#5C4D3C] transition-all"
+                          >
+                            <span
+                              className="w-2 h-2 rounded-full border border-black/20 shrink-0"
+                              style={{ backgroundColor: shade.hex }}
+                            />
+                            <span>{shade.name}</span>
+                          </button>
+                        ))}
                       </div>
                     </div>
                   </div>
