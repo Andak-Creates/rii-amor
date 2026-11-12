@@ -126,7 +126,7 @@ export default function AdminPage() {
 
   const [previewMode, setPreviewMode] = useState<"card" | "dossier">("card");
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-  const [isFormOpen, setIsFormOpen] = useState(true);
+  const [isFormOpen, setIsFormOpen] = useState(false);
 
   // Fetch live products
   const fetchProducts = async () => {
