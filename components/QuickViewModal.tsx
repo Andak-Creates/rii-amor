@@ -5,6 +5,7 @@ import Image from "next/image";
 import { X, ShoppingBag, Heart, Check } from "lucide-react";
 import { Product } from "@/data/products";
 import { formatNaira } from "@/lib/currency";
+import { resolveColorNameToHex } from "@/lib/colors";
 
 interface QuickViewModalProps {
   product: Product | null;
@@ -230,10 +231,10 @@ export default function QuickViewModal({
                             : "bg-[#EDE5DC]/60 text-[#2C2621] border-[#2C2621]/15 hover:border-[#1E1B18]"
                         }`}
                       >
-                        {cv.hex && (
+                        {(cv.hex || resolveColorNameToHex(cv.name)) && (
                           <span
                             className="w-3.5 h-3.5 rounded-full border border-black/20 shrink-0"
-                            style={{ backgroundColor: cv.hex }}
+                            style={{ backgroundColor: resolveColorNameToHex(cv.name) || cv.hex }}
                           />
                         )}
                         <span>{cv.name}</span>

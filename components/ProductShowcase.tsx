@@ -5,6 +5,7 @@ import Image from "next/image";
 import { ShoppingBag, Eye, Heart, Check, Filter } from "lucide-react";
 import { Product } from "@/data/products";
 import { formatNaira } from "@/lib/currency";
+import { resolveColorNameToHex } from "@/lib/colors";
 
 interface ProductShowcaseProps {
   products: Product[];
@@ -220,7 +221,7 @@ export default function ProductShowcase({
                           key={cv.name}
                           title={cv.name}
                           className="w-2.5 h-2.5 rounded-full border border-black/20 shrink-0 shadow-2xs"
-                          style={{ backgroundColor: cv.hex || "#1E1B18" }}
+                          style={{ backgroundColor: resolveColorNameToHex(cv.name) || cv.hex || "#1E1B18" }}
                         />
                       ))}
                       {product.colorVariants.length > 6 && (
