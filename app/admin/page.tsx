@@ -75,6 +75,8 @@ export default function AdminPage() {
   const [colorMode, setColorMode] = useState<"single" | "variants">("single");
   const [newColorName, setNewColorName] = useState("");
   const [newColorHex, setNewColorHex] = useState("#1E1B18");
+  const [newColorQuantity, setNewColorQuantity] = useState("");
+  const [newColorPrice, setNewColorPrice] = useState("");
   const [stagedColorImages, setStagedColorImages] = useState<string[]>([]);
   const [isUploadingStagedColor, setIsUploadingStagedColor] = useState(false);
   const stagedColorFileInputRef = useRef<HTMLInputElement>(null);
@@ -551,6 +553,15 @@ export default function AdminPage() {
         return `hsl(${h}, 45%, 52%)`;
       })();
 
+    const parsedQty =
+      newColorQuantity.trim() !== ""
+        ? Math.max(0, parseInt(newColorQuantity.trim(), 10) || 0)
+        : undefined;
+    const parsedPrice =
+      newColorPrice.trim() !== ""
+        ? Math.max(0, parseFormattedNumber(newColorPrice.trim()) || 0)
+        : undefined;
+
     setFormData((prev) => ({
       ...prev,
       colorVariants: [
@@ -559,6 +570,8 @@ export default function AdminPage() {
           name: trimmed,
           hex: resolvedHex,
           images: [...stagedColorImages],
+          quantity: parsedQty,
+          price: parsedPrice,
         },
       ],
     }));
@@ -566,12 +579,38 @@ export default function AdminPage() {
     // Seamless reset: clear inputs so user can immediately add another colorway!
     setNewColorName("");
     setNewColorHex("#1E1B18");
+    setNewColorQuantity("");
+    setNewColorPrice("");
     setStagedColorImages([]);
     if (stagedColorFileInputRef.current) stagedColorFileInputRef.current.value = "";
     showNotification(
       "success",
-      `Added "${trimmed}" with ${stagedColorImages.length} photo(s)! You can now add another colorway.`
+      `Added "${trimmed}" (${parsedQty !== undefined ? `${parsedQty} in stock` : "unlimited stock"}) with ${stagedColorImages.length} photo(s)! You can now add another colorway.`
     );
+  };
+
+  const handleUpdateColorVariantQuantity = (
+    idx: number,
+    qty: number | undefined
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      colorVariants: prev.colorVariants.map((cv, i) =>
+        i === idx ? { ...cv, quantity: qty } : cv
+      ),
+    }));
+  };
+
+  const handleUpdateColorVariantPrice = (
+    idx: number,
+    price: number | undefined
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      colorVariants: prev.colorVariants.map((cv, i) =>
+        i === idx ? { ...cv, price } : cv
+      ),
+    }));
   };
 
   const handleRemoveColorVariant = (idx: number) => {
@@ -762,17 +801,35 @@ export default function AdminPage() {
 
     const resolvedName = formData.name.trim() || `Piece #${products.length + 1}`;
 
+    const hasColorwayQuantities =
+      colorMode === "variants" &&
+      formData.colorVariants.some((cv) => cv.quantity !== undefined);
+
+    const totalColorwayQuantity = hasColorwayQuantities
+      ? formData.colorVariants.reduce(
+          (sum, cv) => sum + (cv.quantity !== undefined ? cv.quantity : 0),
+          0
+        )
+      : undefined;
+
     const resolvedQuantity =
       formData.quantity !== ""
         ? Math.max(0, parseInt(String(formData.quantity), 10) || 0)
-        : undefined;
+        : totalColorwayQuantity;
+
+    const leadColorwayPrice =
+      formData.colorVariants.find((cv) => cv.price && cv.price > 0)?.price;
+
+    const resolvedPrice = formData.price
+      ? parseFormattedNumber(String(formData.price))
+      : leadColorwayPrice || 0;
 
     const payload = {
       ...formData,
       name: resolvedName,
       image: primaryImage,
       secondaryImage: secondaryImage,
-      price: formData.price ? parseFormattedNumber(String(formData.price)) : 0,
+      price: resolvedPrice,
       quantity: resolvedQuantity,
       inStock:
         resolvedQuantity !== undefined
@@ -843,6 +900,9 @@ export default function AdminPage() {
     setColorMode("single");
     setNewColorName("");
     setNewColorHex("#1E1B18");
+    setNewColorQuantity("");
+    setNewColorPrice("");
+    setStagedColorImages([]);
     setFormData({
       name: "",
       price: "",
@@ -1660,6 +1720,60 @@ export default function AdminPage() {
                         </div>
                       </div>
 
+                      {/* Colorway Quantity & Optional Custom Price */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-[#2C2621]/10">
+                        <div>
+                          <label className="text-[9px] uppercase tracking-wider text-[#8C7A6B] font-semibold block mb-1">
+                            Quantity for &ldquo;{newColorName.trim() || "this color"}&rdquo;
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="e.g. 2, 3 (pieces in stock)"
+                            value={newColorQuantity}
+                            onChange={(e) => setNewColorQuantity(e.target.value)}
+                            className="w-full bg-[#EDE5DC]/40 border border-[#2C2621]/20 rounded-xl px-3 py-2 text-xs text-[#1E1B18] placeholder:text-[#8C7A6B] focus:outline-none focus:border-[#1E1B18]"
+                          />
+                          <span className="text-[8.5px] text-[#736555] block mt-0.5">
+                            {newColorQuantity !== ""
+                              ? `${newColorQuantity} piece${newColorQuantity === "1" ? "" : "s"} of ${newColorName.trim() || "this color"} in stock`
+                              : "Leave blank for unlimited stock"}
+                          </span>
+                        </div>
+
+                        <div>
+                          <label className="text-[9px] uppercase tracking-wider text-[#8C7A6B] font-semibold block mb-1">
+                            Price for this color (Optional)
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-[#8C7A6B] font-serif">
+                              ₦
+                            </span>
+                            <input
+                              type="text"
+                              placeholder={
+                                formData.price
+                                  ? `Base: ₦${formatNumberWithCommas(formData.price)}`
+                                  : "Base piece price if blank"
+                              }
+                              value={newColorPrice}
+                              onChange={(e) => {
+                                const raw = e.target.value.replace(/[^0-9]/g, "");
+                                setNewColorPrice(
+                                  raw ? formatNumberWithCommas(parseInt(raw, 10)) : ""
+                                );
+                              }}
+                              className="w-full bg-[#EDE5DC]/40 border border-[#2C2621]/20 rounded-xl pl-7 pr-3 py-2 text-xs text-[#1E1B18] placeholder:text-[#8C7A6B] focus:outline-none focus:border-[#1E1B18]"
+                            />
+                          </div>
+                          <span className="text-[8.5px] text-[#736555] block mt-0.5">
+                            {newColorPrice
+                              ? `Overrides base price with ₦${newColorPrice}`
+                              : "Uses default piece price"}
+                          </span>
+                        </div>
+                      </div>
+
                       {/* Step 2: Upload Photos for this Color Right Here */}
                       <div className="pt-2 border-t border-[#2C2621]/10">
                         <label className="text-[9px] uppercase tracking-wider text-[#8C7A6B] font-semibold block mb-1.5">
@@ -1747,6 +1861,8 @@ export default function AdminPage() {
                               />
                             )}
                             ADD {newColorName.trim() || "COLORWAY"} PIECE
+                            {newColorQuantity !== "" ? ` • ${newColorQuantity} IN STOCK` : ""}
+                            {newColorPrice !== "" ? ` • ₦${newColorPrice}` : ""}
                             {stagedColorImages.length > 0
                               ? ` (${stagedColorImages.length} PHOTO${stagedColorImages.length > 1 ? "S" : ""})`
                               : ""}
@@ -1835,6 +1951,110 @@ export default function AdminPage() {
                                   <Trash2 className="w-3 h-3" />
                                   <span>Remove</span>
                                 </button>
+                              </div>
+                            </div>
+
+                            {/* Stock Quantity & Custom Price Row */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 my-2.5 p-2.5 bg-[#FAF7F2] rounded-xl border border-[#2C2621]/10">
+                              {/* Stock / Quantity Adjuster */}
+                              <div className="flex items-center justify-between sm:justify-start gap-2">
+                                <span className="text-[9px] uppercase tracking-wider font-semibold text-[#8C7A6B]">
+                                  Stock:
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const cur = cv.quantity ?? 1;
+                                      handleUpdateColorVariantQuantity(
+                                        vIdx,
+                                        Math.max(0, cur - 1)
+                                      );
+                                    }}
+                                    className="w-5 h-5 rounded bg-white border border-[#2C2621]/20 text-[#1E1B18] flex items-center justify-center font-bold hover:bg-[#1E1B18] hover:text-white transition-all text-xs"
+                                    title="Decrease stock"
+                                  >
+                                    -
+                                  </button>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={cv.quantity !== undefined ? cv.quantity : ""}
+                                    placeholder="∞"
+                                    onChange={(e) => {
+                                      const val = e.target.value.trim();
+                                      handleUpdateColorVariantQuantity(
+                                        vIdx,
+                                        val === ""
+                                          ? undefined
+                                          : Math.max(0, parseInt(val, 10) || 0)
+                                      );
+                                    }}
+                                    className="w-14 text-center bg-white border border-[#2C2621]/20 rounded px-1 py-0.5 text-xs font-bold text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const cur = cv.quantity ?? 0;
+                                      handleUpdateColorVariantQuantity(
+                                        vIdx,
+                                        cur + 1
+                                      );
+                                    }}
+                                    className="w-5 h-5 rounded bg-white border border-[#2C2621]/20 text-[#1E1B18] flex items-center justify-center font-bold hover:bg-[#1E1B18] hover:text-white transition-all text-xs"
+                                    title="Increase stock"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                                <span className="text-[10px] text-[#5C4D3C] font-medium">
+                                  {cv.quantity === 0 ? (
+                                    <span className="text-[#992222] font-bold">Sold Out</span>
+                                  ) : cv.quantity !== undefined ? (
+                                    `pc${cv.quantity === 1 ? "" : "s"}`
+                                  ) : (
+                                    "Unlimited"
+                                  )}
+                                </span>
+                              </div>
+
+                              {/* Price Adjuster */}
+                              <div className="flex items-center justify-between sm:justify-start gap-2">
+                                <span className="text-[9px] uppercase tracking-wider font-semibold text-[#8C7A6B]">
+                                  Price:
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[10px] font-serif text-[#8C7A6B]">₦</span>
+                                  <input
+                                    type="text"
+                                    value={
+                                      cv.price ? formatNumberWithCommas(cv.price) : ""
+                                    }
+                                    placeholder={
+                                      formData.price
+                                        ? formatNumberWithCommas(
+                                            parseFormattedNumber(
+                                              String(formData.price)
+                                            )
+                                          )
+                                        : "Base"
+                                    }
+                                    onChange={(e) => {
+                                      const raw = e.target.value.replace(
+                                        /[^0-9]/g,
+                                        ""
+                                      );
+                                      handleUpdateColorVariantPrice(
+                                        vIdx,
+                                        raw ? parseInt(raw, 10) : undefined
+                                      );
+                                    }}
+                                    className="w-24 text-center bg-white border border-[#2C2621]/20 rounded px-1.5 py-0.5 text-xs font-bold text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                                  />
+                                </div>
+                                <span className="text-[9px] text-[#8C7A6B]">
+                                  {cv.price ? "Custom price" : "Uses base price"}
+                                </span>
                               </div>
                             </div>
 
@@ -2082,13 +2302,71 @@ export default function AdminPage() {
                     <label className="text-[10px] tracking-wider uppercase text-[#8C7A6B] font-semibold block">
                       Number of Pieces Available (Stock Count)
                     </label>
-                    <span className="text-[9px] text-[#8C7A6B]">Leave empty if unlimited</span>
+                    <span className="text-[9px] text-[#8C7A6B]">
+                      {colorMode === "variants" &&
+                      formData.colorVariants.some((cv) => cv.quantity !== undefined)
+                        ? "Colorway stock breakdown"
+                        : "Leave empty if unlimited"}
+                    </span>
                   </div>
+
+                  {colorMode === "variants" &&
+                    formData.colorVariants.length > 0 &&
+                    formData.colorVariants.some(
+                      (cv) => cv.quantity !== undefined
+                    ) && (
+                      <div className="mb-2 p-2 bg-[#FAF7F2] rounded-lg border border-[#2C2621]/10 text-xs">
+                        <div className="flex items-center justify-between text-[11px] font-semibold text-[#1E1B18]">
+                          <span>Sum of colorway stocks:</span>
+                          <span className="font-bold text-[#8C6D46]">
+                            {formData.colorVariants.reduce(
+                              (sum, cv) => sum + (cv.quantity ?? 0),
+                              0
+                            )}{" "}
+                            pieces total
+                          </span>
+                        </div>
+                        <div className="flex gap-1.5 flex-wrap mt-1 text-[10px] text-[#736555]">
+                          {formData.colorVariants.map((cv) => (
+                            <span
+                              key={cv.name}
+                              className="inline-flex items-center gap-1 bg-white px-2 py-0.5 rounded border border-[#2C2621]/10"
+                            >
+                              <span
+                                className="w-2 h-2 rounded-full inline-block"
+                                style={{
+                                  backgroundColor: cv.hex || "#8C7A6B",
+                                }}
+                              />
+                              {cv.name}:{" "}
+                              <strong>
+                                {cv.quantity !== undefined
+                                  ? `${cv.quantity} in stock`
+                                  : "∞"}
+                              </strong>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                   <div className="flex items-center gap-2">
                     <input
                       type="number"
                       min="0"
-                      placeholder="e.g. 5, 10, 20"
+                      placeholder={
+                        colorMode === "variants" &&
+                        formData.colorVariants.some(
+                          (cv) => cv.quantity !== undefined
+                        )
+                          ? String(
+                              formData.colorVariants.reduce(
+                                (sum, cv) => sum + (cv.quantity ?? 0),
+                                0
+                              )
+                            )
+                          : "e.g. 5, 10, 20"
+                      }
                       value={formData.quantity}
                       onChange={(e) => {
                         const val = e.target.value;
@@ -2102,10 +2380,26 @@ export default function AdminPage() {
                       className="w-36 bg-[#EDE5DC]/40 border border-[#2C2621]/20 rounded-lg px-3 py-1.5 text-xs font-medium focus:outline-none focus:border-[#1E1B18]"
                     />
                     <span className="text-[11px] text-[#5C4D3C]">
-                      {formData.quantity !== "" && parseInt(String(formData.quantity), 10) === 0 ? (
-                        <span className="text-[#992222] font-semibold">0 pieces — will show as Sold Out</span>
+                      {formData.quantity !== "" &&
+                      parseInt(String(formData.quantity), 10) === 0 ? (
+                        <span className="text-[#992222] font-semibold">
+                          0 pieces — will show as Sold Out
+                        </span>
                       ) : formData.quantity !== "" ? (
-                        <span>{formData.quantity} piece{parseInt(String(formData.quantity), 10) === 1 ? "" : "s"} in stock</span>
+                        <span>
+                          {formData.quantity} piece
+                          {parseInt(String(formData.quantity), 10) === 1
+                            ? ""
+                            : "s"}{" "}
+                          in stock
+                        </span>
+                      ) : colorMode === "variants" &&
+                        formData.colorVariants.some(
+                          (cv) => cv.quantity !== undefined
+                        ) ? (
+                        <span className="text-[#8C6D46] font-medium">
+                          Auto-summed from colorways
+                        </span>
                       ) : (
                         <span className="text-[#8C7A6B]">Unlimited stock</span>
                       )}

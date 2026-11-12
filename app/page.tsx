@@ -87,6 +87,20 @@ export default function Home() {
 
   // Cart operations
   const handleAddToCart = (product: Product, size: string, color?: string) => {
+    const cv = color
+      ? product.colorVariants?.find(
+          (c) => c.name.toLowerCase() === color.toLowerCase()
+        )
+      : null;
+    const maxStock = cv?.quantity !== undefined ? cv.quantity : product.quantity;
+
+    if (maxStock !== undefined && maxStock <= 0) {
+      showToast(`${color || product.name} is currently out of stock`);
+      return;
+    }
+
+    let reachedMax = false;
+
     setCart((prev) => {
       const existing = prev.find(
         (item) =>
@@ -95,6 +109,10 @@ export default function Home() {
           (item.selectedColor || "") === (color || "")
       );
       if (existing) {
+        if (maxStock !== undefined && existing.quantity >= maxStock) {
+          reachedMax = true;
+          return prev;
+        }
         return prev.map((item) =>
           item.product.id === product.id &&
           item.selectedSize === size &&
@@ -108,6 +126,12 @@ export default function Home() {
         { product, selectedSize: size, selectedColor: color, quantity: 1 },
       ];
     });
+
+    if (reachedMax) {
+      showToast(`Only ${maxStock} pieces available in ${color || "stock"}`);
+      return;
+    }
+
     const label = color ? `${product.name} (${size} · ${color})` : `${product.name} (${size})`;
     showToast(`Added ${label} to your bag`);
   };
@@ -118,6 +142,7 @@ export default function Home() {
     delta: number,
     color?: string
   ) => {
+    let maxNotice = "";
     setCart((prev) =>
       prev
         .map((item) => {
@@ -126,6 +151,19 @@ export default function Home() {
             item.selectedSize === size &&
             (item.selectedColor || "") === (color || "")
           ) {
+            const cv = color
+              ? item.product.colorVariants?.find(
+                  (c) => c.name.toLowerCase() === color.toLowerCase()
+                )
+              : null;
+            const maxStock =
+              cv?.quantity !== undefined ? cv.quantity : item.product.quantity;
+
+            if (delta > 0 && maxStock !== undefined && item.quantity >= maxStock) {
+              maxNotice = `Maximum stock reached (${maxStock} pieces in ${color || "stock"})`;
+              return item;
+            }
+
             const newQty = item.quantity + delta;
             return newQty > 0 ? { ...item, quantity: newQty } : null;
           }
@@ -133,6 +171,9 @@ export default function Home() {
         })
         .filter(Boolean) as CartItem[]
     );
+    if (maxNotice) {
+      showToast(maxNotice);
+    }
   };
 
   const handleRemoveFromCart = (productId: string, size: string, color?: string) => {

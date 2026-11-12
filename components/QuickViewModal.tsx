@@ -47,6 +47,21 @@ export default function QuickViewModal({
     (cv) => cv.name === selectedColor
   );
 
+  // Effective price (variant override or base product price)
+  const effectivePrice =
+    activeColorVariant?.price && activeColorVariant.price > 0
+      ? activeColorVariant.price
+      : product.price;
+
+  // Effective stock & quantity (variant override or base product stock)
+  const isColorOutOfStock =
+    activeColorVariant?.quantity !== undefined && activeColorVariant.quantity <= 0;
+  const isEffectiveInStock = product.inStock && !isColorOutOfStock;
+  const effectiveQuantity =
+    activeColorVariant?.quantity !== undefined
+      ? activeColorVariant.quantity
+      : product.quantity;
+
   // Build gallery:
   // If a color variant is selected and has images, use those!
   // Otherwise use product.images or [product.image, product.secondaryImage]
@@ -72,7 +87,12 @@ export default function QuickViewModal({
   };
 
   const handleAdd = () => {
-    onAddToCart(product, currentSize, selectedColor || undefined);
+    if (!isEffectiveInStock) return;
+    const productToAdd =
+      activeColorVariant?.price && activeColorVariant.price > 0
+        ? { ...product, price: activeColorVariant.price }
+        : product;
+    onAddToCart(productToAdd, currentSize, selectedColor || undefined);
     setAdded(true);
     setTimeout(() => {
       setAdded(false);
@@ -178,19 +198,19 @@ export default function QuickViewModal({
 
               <div className="flex items-center gap-3 mt-1">
                 <div className="font-serif text-base sm:text-xl font-medium text-[#1E1B18]">
-                  {product.price > 0 ? formatNaira(product.price) : "Contact for Price"}
+                  {effectivePrice > 0 ? formatNaira(effectivePrice) : "Contact for Price"}
                 </div>
-                {!product.inStock ? (
+                {!isEffectiveInStock ? (
                   <span className="text-[9px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full bg-[#992222]/15 text-[#992222]">
-                    Sold Out
+                    Sold Out {selectedColor ? `• ${selectedColor}` : ""}
                   </span>
-                ) : product.quantity !== undefined && product.quantity > 0 && product.quantity <= 5 ? (
+                ) : effectiveQuantity !== undefined && effectiveQuantity > 0 && effectiveQuantity <= 5 ? (
                   <span className="text-[9px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full bg-[#8C6D46]/15 text-[#8C6D46]">
-                    Only {product.quantity} Left
+                    Only {effectiveQuantity} Left {selectedColor ? `in ${selectedColor}` : ""}
                   </span>
                 ) : (
                   <span className="text-[9px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full bg-[#2A4D33]/15 text-[#2A4D33]">
-                    In Stock
+                    In Stock {effectiveQuantity !== undefined ? `(${effectiveQuantity} available)` : ""}
                   </span>
                 )}
               </div>
@@ -220,6 +240,7 @@ export default function QuickViewModal({
                 <div className="flex flex-wrap gap-2">
                   {product.colorVariants.map((cv) => {
                     const isSelected = selectedColor === cv.name;
+                    const isCvSoldOut = cv.quantity !== undefined && cv.quantity <= 0;
                     return (
                       <button
                         type="button"
@@ -228,6 +249,8 @@ export default function QuickViewModal({
                         className={`px-3 py-1.5 rounded-xl text-[10px] sm:text-xs font-medium uppercase border transition-all flex items-center gap-2 ${
                           isSelected
                             ? "bg-[#1E1B18] text-[#FAF7F2] border-[#1E1B18] shadow-xs ring-1 ring-[#1E1B18]"
+                            : isCvSoldOut
+                            ? "bg-[#EDE5DC]/40 text-[#736555] border-[#2C2621]/10 opacity-60"
                             : "bg-[#EDE5DC]/60 text-[#2C2621] border-[#2C2621]/15 hover:border-[#1E1B18]"
                         }`}
                       >
@@ -238,6 +261,16 @@ export default function QuickViewModal({
                           />
                         )}
                         <span>{cv.name}</span>
+                        {cv.quantity !== undefined && (
+                          <span className="text-[8.5px] opacity-75 font-normal">
+                            {cv.quantity === 0 ? "(Sold Out)" : `(${cv.quantity})`}
+                          </span>
+                        )}
+                        {cv.price && cv.price > 0 && cv.price !== product.price && (
+                          <span className="text-[8.5px] font-serif text-[#C99742]">
+                            {formatNaira(cv.price)}
+                          </span>
+                        )}
                         {isSelected && <Check className="w-3 h-3 text-[#C99742]" />}
                       </button>
                     );
@@ -303,9 +336,9 @@ export default function QuickViewModal({
 
           {/* Sticky Bottom Actions */}
           <div className="p-3.5 sm:p-4 md:p-5 border-t border-[#2C2621]/15 bg-[#F4EFEA] flex items-center gap-2.5 shrink-0">
-            {!product.inStock ? (
+            {!isEffectiveInStock ? (
               <div className="flex-1 py-2.5 sm:py-3 rounded-full text-[10px] sm:text-xs tracking-[0.22em] uppercase font-semibold text-center bg-[#EDE5DC] text-[#736555] border border-[#2C2621]/15">
-                OUT OF STOCK
+                OUT OF STOCK {selectedColor ? `IN ${selectedColor.toUpperCase()}` : ""}
               </div>
             ) : (
               <button
@@ -327,7 +360,7 @@ export default function QuickViewModal({
                   <>
                     <ShoppingBag className="w-4 h-4" />
                     <span>
-                      ADD TO CART • {formatNaira(product.price)}
+                      ADD TO CART • {formatNaira(effectivePrice)}
                     </span>
                   </>
                 )}

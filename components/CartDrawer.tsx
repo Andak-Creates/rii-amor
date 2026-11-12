@@ -35,8 +35,32 @@ export default function CartDrawer({
 
   if (!isOpen) return null;
 
+  const getItemPrice = (item: CartItem) => {
+    if (item.selectedColor && item.product.colorVariants) {
+      const cv = item.product.colorVariants.find(
+        (c) => c.name.toLowerCase() === item.selectedColor?.toLowerCase()
+      );
+      if (cv && cv.price !== undefined && cv.price > 0) {
+        return cv.price;
+      }
+    }
+    return item.product.price;
+  };
+
+  const getItemMaxStock = (item: CartItem) => {
+    if (item.selectedColor && item.product.colorVariants) {
+      const cv = item.product.colorVariants.find(
+        (c) => c.name.toLowerCase() === item.selectedColor?.toLowerCase()
+      );
+      if (cv && cv.quantity !== undefined) {
+        return cv.quantity;
+      }
+    }
+    return item.product.quantity;
+  };
+
   const subtotal = cart.reduce(
-    (sum, item) => sum + item.product.price * item.quantity,
+    (sum, item) => sum + getItemPrice(item) * item.quantity,
     0
   );
 
@@ -83,7 +107,7 @@ export default function CartDrawer({
             productImage: displayImg,
             selectedSize: item.selectedSize,
             selectedColor: item.selectedColor,
-            price: item.product.price,
+            price: getItemPrice(item),
             quantity: item.quantity,
           };
         }),
@@ -276,7 +300,7 @@ export default function CartDrawer({
                         </div>
 
                         <div className="font-serif text-sm font-medium text-[#1E1B18] mt-1">
-                          {formatNaira(item.product.price)}
+                          {formatNaira(getItemPrice(item))}
                         </div>
                       </div>
 
@@ -308,14 +332,24 @@ export default function CartDrawer({
                                 item.selectedColor
                               )
                             }
-                            className="p-1 hover:text-[#8C6D46] transition-colors"
+                            disabled={(() => {
+                              const max = getItemMaxStock(item);
+                              return max !== undefined && item.quantity >= max;
+                            })()}
+                            className="p-1 hover:text-[#8C6D46] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            title={(() => {
+                              const max = getItemMaxStock(item);
+                              return max !== undefined && item.quantity >= max
+                                ? `Max stock reached (${max} available)`
+                                : "Increase quantity";
+                            })()}
                           >
                             <Plus className="w-3 h-3" />
                           </button>
                         </div>
 
                         <span className="text-xs font-serif font-semibold text-[#1E1B18]">
-                          {formatNaira(item.product.price * item.quantity)}
+                          {formatNaira(getItemPrice(item) * item.quantity)}
                         </span>
                       </div>
                     </div>

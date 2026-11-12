@@ -216,14 +216,35 @@ export default function ProductShowcase({
                   {/* Color Swatches if available */}
                   {product.colorVariants && product.colorVariants.length > 0 && (
                     <div className="flex items-center gap-1.5 mt-1.5">
-                      {product.colorVariants.slice(0, 6).map((cv) => (
-                        <span
-                          key={cv.name}
-                          title={cv.name}
-                          className="w-2.5 h-2.5 rounded-full border border-black/20 shrink-0 shadow-2xs"
-                          style={{ backgroundColor: resolveColorNameToHex(cv.name) || cv.hex || "#1E1B18" }}
-                        />
-                      ))}
+                      {product.colorVariants.slice(0, 6).map((cv) => {
+                        const isCvSoldOut =
+                          cv.quantity !== undefined && cv.quantity <= 0;
+                        return (
+                          <span
+                            key={cv.name}
+                            title={
+                              cv.quantity !== undefined
+                                ? `${cv.name} (${
+                                    cv.quantity === 0
+                                      ? "Sold Out"
+                                      : `${cv.quantity} in stock`
+                                  })`
+                                : cv.name
+                            }
+                            className={`w-2.5 h-2.5 rounded-full border border-black/20 shrink-0 shadow-2xs ${
+                              isCvSoldOut
+                                ? "opacity-35 ring-1 ring-[#992222]/40"
+                                : ""
+                            }`}
+                            style={{
+                              backgroundColor:
+                                resolveColorNameToHex(cv.name) ||
+                                cv.hex ||
+                                "#1E1B18",
+                            }}
+                          />
+                        );
+                      })}
                       {product.colorVariants.length > 6 && (
                         <span className="text-[8px] text-[#8C7A6B] font-medium">
                           +{product.colorVariants.length - 6}

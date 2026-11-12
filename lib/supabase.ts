@@ -46,7 +46,19 @@ function mapDbToProduct(row: Record<string, unknown>): Product {
     try {
       const parsed = typeof rawCV === "string" ? JSON.parse(rawCV) : rawCV;
       if (Array.isArray(parsed) && parsed.length > 0) {
-        colorVariants = parsed as ColorVariant[];
+        colorVariants = parsed.map((item: Record<string, unknown>) => ({
+          name: String(item.name || "").trim(),
+          hex: item.hex ? String(item.hex) : undefined,
+          images: Array.isArray(item.images) ? (item.images as string[]) : [],
+          quantity:
+            item.quantity !== undefined && item.quantity !== null && item.quantity !== ""
+              ? Number(item.quantity)
+              : undefined,
+          price:
+            item.price !== undefined && item.price !== null && item.price !== ""
+              ? Number(item.price)
+              : undefined,
+        })) as ColorVariant[];
       }
     } catch {
       // ignore malformed color_variants
