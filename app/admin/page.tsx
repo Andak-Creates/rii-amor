@@ -75,6 +75,9 @@ export default function AdminPage() {
   const [colorMode, setColorMode] = useState<"single" | "variants">("single");
   const [newColorName, setNewColorName] = useState("");
   const [newColorHex, setNewColorHex] = useState("#1E1B18");
+  const [stagedColorImages, setStagedColorImages] = useState<string[]>([]);
+  const [isUploadingStagedColor, setIsUploadingStagedColor] = useState(false);
+  const stagedColorFileInputRef = useRef<HTMLInputElement>(null);
   const [variantUploadingIdx, setVariantUploadingIdx] = useState<number | null>(null);
 
   // File upload state
@@ -459,34 +462,105 @@ export default function AdminPage() {
     }
   };
 
+  const handleStagedColorImageUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    setIsUploadingStagedColor(true);
+    const uploadedUrls: string[] = [];
+
+    for (const file of files) {
+      const body = new FormData();
+      body.append("file", file);
+      try {
+        const res = await fetch("/api/upload", { method: "POST", body });
+        if (res.ok) {
+          const data = await res.json();
+          uploadedUrls.push(data.url);
+        }
+      } catch (err) {
+        console.error("Staged color image upload error:", err);
+      }
+    }
+
+    if (uploadedUrls.length > 0) {
+      setStagedColorImages((prev) => [...prev, ...uploadedUrls]);
+      showNotification(
+        "success",
+        `Attached ${uploadedUrls.length} photo(s) to this colorway.`
+      );
+    } else {
+      showNotification("error", "Failed to upload photo(s).");
+    }
+    setIsUploadingStagedColor(false);
+    e.target.value = "";
+  };
+
+  const removeStagedColorImage = async (url: string) => {
+    setStagedColorImages((prev) => prev.filter((u) => u !== url));
+    if (url.includes("/product-images/")) {
+      try {
+        await fetch(`/api/upload?url=${encodeURIComponent(url)}`, {
+          method: "DELETE",
+        });
+      } catch {
+        // background cleanup
+      }
+    }
+  };
+
   const handleAddColorVariant = () => {
-    if (!newColorName.trim()) {
-      showNotification("error", "Please enter a color name (e.g. Hazel nut, Noir, Emerald)");
+    const trimmed = newColorName.trim();
+    if (!trimmed) {
+      showNotification(
+        "error",
+        "Please enter a color name (e.g. Hazel nut, Noir, Emerald)"
+      );
       return;
     }
     const exists = formData.colorVariants.some(
-      (cv) => cv.name.toLowerCase() === newColorName.trim().toLowerCase()
+      (cv) => cv.name.toLowerCase() === trimmed.toLowerCase()
     );
     if (exists) {
-      showNotification("error", `Color "${newColorName}" already exists for this piece.`);
+      showNotification(
+        "error",
+        `Colorway "${trimmed}" already exists for this piece.`
+      );
+      return;
+    }
+    if (stagedColorImages.length === 0) {
+      showNotification(
+        "error",
+        `Please attach at least one photo for "${trimmed}" before adding.`
+      );
       return;
     }
 
-    const resolvedHex = resolveColorNameToHex(newColorName.trim()) || newColorHex;
+    const resolvedHex = resolveColorNameToHex(trimmed) || newColorHex;
 
     setFormData((prev) => ({
       ...prev,
       colorVariants: [
         ...prev.colorVariants,
         {
-          name: newColorName.trim(),
+          name: trimmed,
           hex: resolvedHex,
-          images: [],
+          images: [...stagedColorImages],
         },
       ],
     }));
+
+    // Seamless reset: clear inputs so user can immediately add another colorway!
     setNewColorName("");
-    showNotification("success", `Added colorway "${newColorName.trim()}"`);
+    setNewColorHex("#1E1B18");
+    setStagedColorImages([]);
+    if (stagedColorFileInputRef.current) stagedColorFileInputRef.current.value = "";
+    showNotification(
+      "success",
+      `Added "${trimmed}" with ${stagedColorImages.length} photo(s)! You can now add another colorway.`
+    );
   };
 
   const handleRemoveColorVariant = (idx: number) => {
@@ -1502,16 +1576,27 @@ export default function AdminPage() {
                       </p>
                     </div>
 
-                    {/* Add New Colorway Input Card */}
-                    <div className="bg-white p-3.5 rounded-xl border border-[#2C2621]/15 mb-4 shadow-xs">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
-                        <div className="flex-1">
+                    {/* ADD NEW COLORWAY CREATOR BOX */}
+                    <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-[#2C2621]/15 mb-4 shadow-xs space-y-3">
+                      <div className="flex items-center justify-between pb-2 border-b border-[#2C2621]/10">
+                        <span className="text-[10px] tracking-[0.18em] uppercase font-bold text-[#8C6D46] flex items-center gap-1.5">
+                          <Palette className="w-3.5 h-3.5" />
+                          <span>NEW COLORWAY BUILDER</span>
+                        </span>
+                        <span className="text-[9px] text-[#8C7A6B]">
+                          Name &rarr; Photos &rarr; Add
+                        </span>
+                      </div>
+
+                      {/* Step 1: Color Name and Swatch */}
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                        <div className="sm:col-span-8">
                           <label className="text-[9px] uppercase tracking-wider text-[#8C7A6B] font-semibold block mb-1">
-                            Colorway Name
+                            1. Colorway Name
                           </label>
                           <input
                             type="text"
-                            placeholder="e.g. Hazel nut, Emerald, Noir, Burgundy, Champagne"
+                            placeholder="e.g. Hazel nut, Noir, Emerald Green, Burgundy"
                             value={newColorName}
                             onChange={(e) => handleColorNameChange(e.target.value)}
                             onKeyDown={(e) => {
@@ -1520,7 +1605,7 @@ export default function AdminPage() {
                                 handleAddColorVariant();
                               }
                             }}
-                            className="w-full bg-[#EDE5DC]/40 border border-[#2C2621]/20 rounded-lg px-3 py-1.5 text-xs text-[#1E1B18] placeholder:text-[#8C7A6B] focus:outline-none focus:border-[#1E1B18]"
+                            className="w-full bg-[#EDE5DC]/40 border border-[#2C2621]/20 rounded-xl px-3 py-2 text-xs text-[#1E1B18] placeholder:text-[#8C7A6B] focus:outline-none focus:border-[#1E1B18]"
                           />
 
                           {/* Live Color Recognition Indicator */}
@@ -1535,40 +1620,29 @@ export default function AdminPage() {
                           )}
                         </div>
 
-                        <div className="w-32 shrink-0">
+                        <div className="sm:col-span-4">
                           <label className="text-[9px] uppercase tracking-wider text-[#8C7A6B] font-semibold block mb-1">
                             Swatch Color
                           </label>
-                          <div className="flex items-center gap-2 bg-[#EDE5DC]/40 border border-[#2C2621]/20 rounded-lg px-2 py-1">
+                          <div className="flex items-center gap-2 bg-[#EDE5DC]/40 border border-[#2C2621]/20 rounded-xl px-2.5 py-1.5">
                             <input
                               type="color"
                               value={newColorHex}
                               onChange={(e) => setNewColorHex(e.target.value)}
-                              className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent p-0"
+                              className="w-7 h-7 rounded-lg cursor-pointer border-0 bg-transparent p-0"
                               title="Fine-tune swatch color"
                             />
-                            <span className="text-[10px] font-mono text-[#5C4D3C] uppercase truncate">
+                            <span className="text-[10px] font-mono font-medium text-[#5C4D3C] uppercase truncate">
                               {newColorHex}
                             </span>
                           </div>
                         </div>
-
-                        <div className="sm:self-end">
-                          <button
-                            type="button"
-                            onClick={handleAddColorVariant}
-                            className="w-full sm:w-auto px-4 py-2 bg-[#1E1B18] hover:bg-[#8C6D46] text-[#FAF7F2] rounded-lg text-[10px] tracking-wider uppercase font-semibold transition-all flex items-center justify-center gap-1 shadow-xs"
-                          >
-                            <Plus className="w-3 h-3" />
-                            <span>Add Colorway</span>
-                          </button>
-                        </div>
                       </div>
 
                       {/* Quick-Pick Popular Fashion Palette */}
-                      <div className="mt-2.5 pt-2 border-t border-[#2C2621]/10">
+                      <div>
                         <span className="text-[8.5px] uppercase tracking-wider text-[#8C7A6B] block mb-1 font-medium">
-                          Quick-Select Popular Atelier Shades:
+                          Quick-Pick Atelier Shades:
                         </span>
                         <div className="flex items-center gap-1.5 flex-wrap">
                           {[
@@ -1600,6 +1674,93 @@ export default function AdminPage() {
                             </button>
                           ))}
                         </div>
+                      </div>
+
+                      {/* Step 2: Upload Photos for this Color Right Here */}
+                      <div className="pt-2 border-t border-[#2C2621]/10">
+                        <label className="text-[9px] uppercase tracking-wider text-[#8C7A6B] font-semibold block mb-1.5">
+                          2. Photos for &ldquo;{newColorName.trim() || "This Colorway"}&rdquo;
+                        </label>
+
+                        {/* Hidden multi-file input */}
+                        <input
+                          type="file"
+                          ref={stagedColorFileInputRef}
+                          id="staged-color-upload"
+                          accept="image/*"
+                          multiple
+                          onChange={handleStagedColorImageUpload}
+                          className="hidden"
+                        />
+
+                        <label
+                          htmlFor="staged-color-upload"
+                          className="w-full cursor-pointer py-3 px-4 bg-[#EDE5DC]/80 hover:bg-[#1E1B18] hover:text-white text-[#1E1B18] rounded-xl text-xs uppercase tracking-wider font-semibold transition-all border border-[#2C2621]/20 flex items-center justify-center gap-2 shadow-2xs"
+                        >
+                          <Camera className="w-4 h-4" />
+                          <span>
+                            {isUploadingStagedColor
+                              ? "Uploading photos from device..."
+                              : stagedColorImages.length > 0
+                              ? "+ Choose More Photos for this Color"
+                              : `Choose Photos for ${newColorName.trim() || "this Color"}`}
+                          </span>
+                        </label>
+
+                        {/* Attached Photos Preview Strip */}
+                        {stagedColorImages.length > 0 && (
+                          <div className="mt-2.5">
+                            <span className="text-[8.5px] text-[#8C6D46] uppercase font-semibold block mb-1">
+                              {stagedColorImages.length} photo{stagedColorImages.length > 1 ? "s" : ""} attached:
+                            </span>
+                            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+                              {stagedColorImages.map((url, idx) => (
+                                <div
+                                  key={url + idx}
+                                  className="relative shrink-0 w-16 h-20 rounded-lg overflow-hidden border border-[#2C2621]/20 bg-[#EDE5DC] group"
+                                >
+                                  <Image
+                                    src={url}
+                                    alt={`Preview ${idx + 1}`}
+                                    fill
+                                    className="object-cover"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => removeStagedColorImage(url)}
+                                    className="absolute top-1 right-1 w-4 h-4 rounded-full bg-[#992222] text-white text-[8px] flex items-center justify-center font-bold shadow"
+                                    title="Remove photo"
+                                  >
+                                    ✕
+                                  </button>
+                                  {idx === 0 && (
+                                    <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[6.5px] uppercase font-bold text-center py-0.5">
+                                      Lead
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Step 3: Confirm Button to Add the Colorway */}
+                      <div className="pt-2 border-t border-[#2C2621]/10">
+                        <button
+                          type="button"
+                          onClick={handleAddColorVariant}
+                          disabled={isUploadingStagedColor}
+                          className="w-full py-3 bg-[#1E1B18] hover:bg-[#8C6D46] active:scale-[0.99] text-[#FAF7F2] rounded-xl text-xs tracking-[0.2em] uppercase font-semibold transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>
+                            ADD &ldquo;{newColorName.trim() || "COLORWAY"}&rdquo; TO PIECE
+                            {stagedColorImages.length > 0
+                              ? ` (${stagedColorImages.length} PHOTO${stagedColorImages.length > 1 ? "S" : ""})`
+                              : ""}
+                          </span>
+                        </button>
                       </div>
                     </div>
 
