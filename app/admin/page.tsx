@@ -16,8 +16,11 @@ import {
   AlertCircle,
   ShoppingBag,
   Camera,
+  Package,
+  Clock,
+  Palette,
 } from "lucide-react";
-import { Product } from "@/data/products";
+import { Product, ColorVariant, Order } from "@/data/products";
 import {
   formatNaira,
   formatNumberWithCommas,
@@ -62,6 +65,16 @@ export default function AdminPage() {
     text: string;
   } | null>(null);
 
+  // Tab switcher & Orders state
+  const [activeTab, setActiveTab] = useState<"inventory" | "orders">("inventory");
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+
+  // Color variant creation state
+  const [newColorName, setNewColorName] = useState("");
+  const [newColorHex, setNewColorHex] = useState("#1E1B18");
+  const [variantUploadingIdx, setVariantUploadingIdx] = useState<number | null>(null);
+
   // File upload state
   const [isUploading, setIsUploading] = useState(false);
   const multiFileInputRef = useRef<HTMLInputElement>(null);
@@ -86,6 +99,7 @@ export default function AdminPage() {
     quantity: number | string;
     inStock: boolean;
     isHeroFeatured: boolean;
+    colorVariants: ColorVariant[];
   }>({
     name: "",
     price: "",
@@ -99,6 +113,7 @@ export default function AdminPage() {
     quantity: "",
     inStock: true,
     isHeroFeatured: false,
+    colorVariants: [],
   });
 
   const [previewMode, setPreviewMode] = useState<"card" | "dossier">("card");
@@ -120,8 +135,25 @@ export default function AdminPage() {
     }
   };
 
+  // Fetch client orders
+  const fetchOrders = async () => {
+    try {
+      setLoadingOrders(true);
+      const res = await fetch("/api/orders");
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) setOrders(data);
+      }
+    } catch (err) {
+      console.error("Failed to load orders:", err);
+    } finally {
+      setLoadingOrders(false);
+    }
+  };
+
   useEffect(() => {
     fetchProducts();
+    fetchOrders();
   }, []);
 
   // ── PASSWORD GATE EARLY RETURN (all hooks declared above) ─────────
@@ -407,6 +439,117 @@ export default function AdminPage() {
     });
   };
 
+  // Color Variant handlers
+  const handleAddColorVariant = () => {
+    if (!newColorName.trim()) {
+      showNotification("error", "Please enter a color name (e.g. Noir, Emerald)");
+      return;
+    }
+    const exists = formData.colorVariants.some(
+      (cv) => cv.name.toLowerCase() === newColorName.trim().toLowerCase()
+    );
+    if (exists) {
+      showNotification("error", `Color "${newColorName}" already exists for this piece.`);
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      colorVariants: [
+        ...prev.colorVariants,
+        {
+          name: newColorName.trim(),
+          hex: newColorHex,
+          images: [],
+        },
+      ],
+    }));
+    setNewColorName("");
+    showNotification("success", `Added colorway "${newColorName.trim()}"`);
+  };
+
+  const handleRemoveColorVariant = (idx: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      colorVariants: prev.colorVariants.filter((_, i) => i !== idx),
+    }));
+  };
+
+  const handleVariantImageUpload = async (
+    variantIdx: number,
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    setVariantUploadingIdx(variantIdx);
+    const uploadedUrls: string[] = [];
+
+    for (const file of files) {
+      const body = new FormData();
+      body.append("file", file);
+      try {
+        const res = await fetch("/api/upload", { method: "POST", body });
+        if (res.ok) {
+          const data = await res.json();
+          uploadedUrls.push(data.url);
+        }
+      } catch {
+        // skip
+      }
+    }
+
+    if (uploadedUrls.length > 0) {
+      setFormData((prev) => {
+        const updated = [...prev.colorVariants];
+        updated[variantIdx] = {
+          ...updated[variantIdx],
+          images: [...updated[variantIdx].images, ...uploadedUrls],
+        };
+        return { ...prev, colorVariants: updated };
+      });
+      showNotification(
+        "success",
+        `Uploaded ${uploadedUrls.length} photo(s) for ${formData.colorVariants[variantIdx].name}`
+      );
+    } else {
+      showNotification("error", "Failed to upload photos for this colorway.");
+    }
+    setVariantUploadingIdx(null);
+    e.target.value = "";
+  };
+
+  const handleRemoveVariantImage = (variantIdx: number, imgUrl: string) => {
+    setFormData((prev) => {
+      const updated = [...prev.colorVariants];
+      updated[variantIdx] = {
+        ...updated[variantIdx],
+        images: updated[variantIdx].images.filter((u) => u !== imgUrl),
+      };
+      return { ...prev, colorVariants: updated };
+    });
+  };
+
+  // Order status update
+  const handleUpdateOrderStatus = async (orderId: string, status: Order["status"]) => {
+    try {
+      const res = await fetch("/api/orders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: orderId, status }),
+      });
+      if (res.ok) {
+        setOrders((prev) =>
+          prev.map((o) => (o.id === orderId ? { ...o, status } : o))
+        );
+        showNotification("success", `Order updated to ${status.toUpperCase()}`);
+      }
+    } catch (err) {
+      console.error("Order status update failed:", err);
+      showNotification("error", "Failed to update order status.");
+    }
+  };
+
   // Save Piece
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -445,6 +588,8 @@ export default function AdminPage() {
         formData.images.length > 0
           ? formData.images
           : [primaryImage, secondaryImage].filter(Boolean),
+      colorVariants:
+        formData.colorVariants.length > 0 ? formData.colorVariants : undefined,
       id: editingId || undefined,
     };
 
@@ -490,6 +635,7 @@ export default function AdminPage() {
       quantity: product.quantity !== undefined ? String(product.quantity) : "",
       inStock: product.inStock,
       isHeroFeatured: Boolean(product.isHeroFeatured),
+      colorVariants: product.colorVariants ? [...product.colorVariants] : [],
     });
     window.scrollTo({ top: 120, behavior: "smooth" });
     showNotification("success", `Editing "${product.name}"`);
@@ -510,6 +656,7 @@ export default function AdminPage() {
       quantity: "",
       inStock: true,
       isHeroFeatured: false,
+      colorVariants: [],
     });
   };
 
@@ -529,6 +676,7 @@ export default function AdminPage() {
     inStock: formData.inStock,
     isHeroFeatured: formData.isHeroFeatured,
     images: formData.images.length > 0 ? formData.images : undefined,
+    colorVariants: formData.colorVariants.length > 0 ? formData.colorVariants : undefined,
   };
 
   return (
@@ -643,8 +791,222 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* 2-COLUMN WORKSPACE */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
+        {/* TAB SWITCHER: INVENTORY vs RECENT ORDERS */}
+        <div className="flex items-center gap-2 mb-6 border-b border-[#2C2621]/15 pb-3">
+          <button
+            onClick={() => setActiveTab("inventory")}
+            className={`px-4 py-2 rounded-full text-xs uppercase tracking-wider font-semibold transition-all flex items-center gap-2 ${
+              activeTab === "inventory"
+                ? "bg-[#1E1B18] text-[#FAF7F2] shadow-xs"
+                : "bg-white/80 hover:bg-white text-[#5C4D3C] border border-[#2C2621]/15"
+            }`}
+          >
+            <ShoppingBag className="w-3.5 h-3.5" />
+            <span>Pieces &amp; Inventory ({products.length})</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab("orders");
+              fetchOrders();
+            }}
+            className={`px-4 py-2 rounded-full text-xs uppercase tracking-wider font-semibold transition-all flex items-center gap-2 ${
+              activeTab === "orders"
+                ? "bg-[#1E1B18] text-[#FAF7F2] shadow-xs"
+                : "bg-white/80 hover:bg-white text-[#5C4D3C] border border-[#2C2621]/15"
+            }`}
+          >
+            <Package className="w-3.5 h-3.5" />
+            <span>Recent Orders ({orders.length})</span>
+            {orders.filter((o) => o.status === "confirmed").length > 0 && (
+              <span className="w-2 h-2 rounded-full bg-[#8C6D46] animate-pulse" />
+            )}
+          </button>
+        </div>
+
+        {activeTab === "orders" ? (
+          /* ORDERS STUDIO VIEW */
+          <div className="bg-[#FAF7F2] rounded-2xl p-5 sm:p-7 border border-[#2C2621]/15 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-6 border-b border-[#2C2621]/10 gap-3">
+              <div>
+                <span className="text-[9px] tracking-[0.25em] uppercase text-[#8C7A6B] font-semibold block">
+                  ATELIER ACQUISITIONS
+                </span>
+                <h3 className="font-serif text-lg sm:text-2xl uppercase font-semibold text-[#1E1B18]">
+                  Recent Client Orders ({orders.length})
+                </h3>
+                <p className="text-xs text-[#5C4D3C] mt-0.5">
+                  Real-time record of all client orders placed through the shopping bag.
+                </p>
+              </div>
+
+              <button
+                onClick={fetchOrders}
+                className="px-3.5 py-1.5 border border-[#2C2621]/20 hover:border-[#1E1B18] rounded-full text-xs tracking-wider uppercase text-[#1E1B18] bg-white transition-all flex items-center gap-1.5 self-start sm:self-auto shadow-xs"
+              >
+                <RefreshCw
+                  className={`w-3.5 h-3.5 ${loadingOrders ? "animate-spin" : ""}`}
+                />
+                <span>Refresh Orders</span>
+              </button>
+            </div>
+
+            {loadingOrders ? (
+              <div className="py-16 text-center text-xs tracking-wider uppercase text-[#8C7A6B]">
+                Loading client orders...
+              </div>
+            ) : orders.length === 0 ? (
+              <div className="py-16 text-center rounded-2xl bg-[#EDE5DC]/40 border border-dashed border-[#2C2621]/20 p-8">
+                <Package className="w-10 h-10 text-[#8C7A6B] mx-auto mb-2 opacity-50" />
+                <h4 className="font-serif text-base uppercase text-[#1E1B18] font-semibold mb-1">
+                  No Client Orders Placed Yet
+                </h4>
+                <p className="text-xs text-[#5C4D3C] max-w-sm mx-auto leading-relaxed">
+                  When a client checks out from the shopping bag, their selected pieces, colorways, sizes, and total will be logged here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {orders.map((order) => (
+                  <div
+                    key={order.id}
+                    className="bg-white rounded-2xl p-4 sm:p-5 border border-[#2C2621]/15 shadow-xs space-y-3"
+                  >
+                    {/* Order Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[#2C2621]/10">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-serif text-sm sm:text-base font-bold text-[#1E1B18] tracking-wider">
+                          {order.orderNumber}
+                        </span>
+                        <span className="text-[10px] text-[#8C7A6B] flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {new Date(order.createdAt).toLocaleDateString("en-GB", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                        {order.promoCode && (
+                          <span className="text-[8px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#8C6D46]/15 text-[#8C6D46] font-semibold">
+                            Promo: {order.promoCode}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Status Badge & Status Actions */}
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`text-[9px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full border ${
+                            order.status === "delivered"
+                              ? "bg-[#2A4D33]/15 text-[#2A4D33] border-[#2A4D33]/30"
+                              : order.status === "shipped"
+                              ? "bg-[#8C6D46]/15 text-[#8C6D46] border-[#8C6D46]/30"
+                              : "bg-[#1E1B18]/10 text-[#1E1B18] border-[#1E1B18]/25"
+                          }`}
+                        >
+                          ● {order.status.toUpperCase()}
+                        </span>
+
+                        {order.status === "confirmed" && (
+                          <button
+                            onClick={() => handleUpdateOrderStatus(order.id, "shipped")}
+                            className="text-[9px] uppercase tracking-wider px-2.5 py-1 rounded-full bg-[#1E1B18] hover:bg-[#8C6D46] text-[#FAF7F2] font-semibold transition-all"
+                          >
+                            Mark Shipped →
+                          </button>
+                        )}
+                        {order.status === "shipped" && (
+                          <button
+                            onClick={() => handleUpdateOrderStatus(order.id, "delivered")}
+                            className="text-[9px] uppercase tracking-wider px-2.5 py-1 rounded-full bg-[#2A4D33] hover:bg-[#1E1B18] text-white font-semibold transition-all"
+                          >
+                            Mark Delivered ✓
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Items List */}
+                    <div className="divide-y divide-[#2C2621]/5">
+                      {order.items.map((item, idx) => (
+                        <div
+                          key={idx}
+                          className="py-2.5 flex items-center justify-between gap-3"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="relative w-12 h-14 rounded-lg overflow-hidden bg-[#EDE5DC] shrink-0 border border-[#2C2621]/10">
+                              {item.productImage ? (
+                                <Image
+                                  src={item.productImage}
+                                  alt={item.productName}
+                                  fill
+                                  className="object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-[8px] text-[#8C7A6B]">
+                                  Piece
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              <h5 className="font-serif text-xs sm:text-sm uppercase font-semibold text-[#1E1B18]">
+                                {item.productName}
+                              </h5>
+                              <div className="text-[10px] text-[#736555] flex items-center gap-1.5 flex-wrap mt-0.5">
+                                <span>
+                                  Size: <strong className="text-[#1E1B18]">{item.selectedSize}</strong>
+                                </span>
+                                {item.selectedColor && (
+                                  <>
+                                    <span>•</span>
+                                    <span>
+                                      Colorway: <strong className="text-[#8C6D46]">{item.selectedColor}</strong>
+                                    </span>
+                                  </>
+                                )}
+                                <span>•</span>
+                                <span>
+                                  Qty: <strong className="text-[#1E1B18]">{item.quantity}</strong>
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <span className="font-serif text-xs sm:text-sm font-semibold text-[#1E1B18] shrink-0">
+                            {formatNaira(item.price * item.quantity)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Order Totals Summary */}
+                    <div className="pt-2.5 border-t border-[#2C2621]/10 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-[#5C4D3C] gap-2">
+                      <div className="flex items-center gap-3 text-[11px] flex-wrap">
+                        <span>Subtotal: {formatNaira(order.subtotal)}</span>
+                        {order.discount > 0 && (
+                          <span className="text-[#2A4D33]">
+                            Discount: -{formatNaira(order.discount)}
+                          </span>
+                        )}
+                        <span>
+                          Shipping: {order.shipping === 0 ? "Complimentary" : formatNaira(order.shipping)}
+                        </span>
+                      </div>
+                      <div className="text-sm font-serif font-bold text-[#1E1B18]">
+                        Total: {formatNaira(order.total)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            {/* 2-COLUMN WORKSPACE */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
           {/* LEFT COLUMN: THE FORM (7 cols) */}
           <div className="lg:col-span-7 bg-[#FAF7F2] rounded-2xl p-5 sm:p-7 border border-[#2C2621]/15 shadow-sm">
             <div className="flex items-center justify-between border-b border-[#2C2621]/10 pb-3 mb-5">
@@ -816,8 +1178,8 @@ export default function AdminPage() {
                             className="object-cover pointer-events-none"
                           />
 
-                          {/* Quick reorder controls (visible on hover / touch) */}
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-1">
+                          {/* Quick reorder controls (visible directly on mobile, on hover for desktop) */}
+                          <div className="absolute inset-0 bg-black/45 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex flex-col justify-between p-1">
                             <div className="flex justify-between items-center">
                               {idx > 0 ? (
                                 <button
@@ -851,7 +1213,7 @@ export default function AdminPage() {
                               </button>
                             </div>
 
-                            {/* Arrow buttons for mobile reordering */}
+                            {/* Arrow buttons for mobile & quick repositioning */}
                             <div className="flex justify-center gap-1">
                               {idx > 0 && (
                                 <button
@@ -860,7 +1222,7 @@ export default function AdminPage() {
                                     e.stopPropagation();
                                     moveImage(idx, idx - 1);
                                   }}
-                                  className="px-1.5 py-0.5 rounded bg-white/90 text-[#1E1B18] text-[8px] font-bold hover:bg-white shadow"
+                                  className="px-1.5 py-0.5 rounded bg-white/95 text-[#1E1B18] text-[8px] font-bold hover:bg-white shadow"
                                   title="Move Left"
                                 >
                                   ◀
@@ -873,7 +1235,7 @@ export default function AdminPage() {
                                     e.stopPropagation();
                                     moveImage(idx, idx + 1);
                                   }}
-                                  className="px-1.5 py-0.5 rounded bg-white/90 text-[#1E1B18] text-[8px] font-bold hover:bg-white shadow"
+                                  className="px-1.5 py-0.5 rounded bg-white/95 text-[#1E1B18] text-[8px] font-bold hover:bg-white shadow"
                                   title="Move Right"
                                 >
                                   ▶
@@ -882,9 +1244,9 @@ export default function AdminPage() {
                             </div>
                           </div>
 
-                          {/* Default Badge when not hovered */}
+                          {/* Default Badge */}
                           <span
-                            className={`absolute bottom-0 left-0 right-0 text-center text-[7px] font-bold uppercase tracking-wider py-0.5 group-hover:opacity-0 transition-opacity ${
+                            className={`absolute bottom-0 left-0 right-0 text-center text-[7px] font-bold uppercase tracking-wider py-0.5 opacity-0 sm:opacity-100 sm:group-hover:opacity-0 transition-opacity ${
                               idx === 0
                                 ? "bg-[#1E1B18] text-[#C99742]"
                                 : idx === 1
@@ -920,15 +1282,172 @@ export default function AdminPage() {
                         CURRENT PHOTO
                       </span>
                       <p className="text-[10px] text-[#1E1B18] truncate font-medium">
-                        {formData.image.startsWith("/uploads/")
-                          ? "Uploaded from your device ✓"
+                        {formData.image.startsWith("http")
+                          ? "Stored in Supabase Cloud ✓"
+                          : formData.image
+                          ? "Photo chosen ✓"
                           : "No photo chosen — upload from your device above"}
                       </p>
                     </div>
                   </div>
                 )}
 
-                
+                {/* 2B. COLORWAYS & VARIANTS (OPTIONAL) */}
+                <div className="mt-5 pt-4 border-t border-[#2C2621]/10">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <h5 className="text-[11px] tracking-[0.18em] uppercase font-semibold text-[#8C6D46] flex items-center gap-1.5">
+                        <Palette className="w-3.5 h-3.5" />
+                        <span>COLORWAYS &amp; VARIANTS (OPTIONAL)</span>
+                      </h5>
+                      <p className="text-[10px] text-[#736555] mt-0.5">
+                        Does this piece have other colors? Add colorways (e.g. Noir, Cream, Olive) and upload their dedicated photos below.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Add New Colorway Input Card */}
+                  <div className="bg-white p-3 rounded-xl border border-[#2C2621]/15 mb-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                      <div className="flex-1">
+                        <label className="text-[9px] uppercase tracking-wider text-[#8C7A6B] font-semibold block mb-1">
+                          Colorway Name
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Emerald Green, Jet Black, Ivory"
+                          value={newColorName}
+                          onChange={(e) => setNewColorName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleAddColorVariant();
+                            }
+                          }}
+                          className="w-full bg-[#EDE5DC]/40 border border-[#2C2621]/20 rounded-lg px-3 py-1.5 text-xs text-[#1E1B18] placeholder:text-[#8C7A6B] focus:outline-none focus:border-[#1E1B18]"
+                        />
+                      </div>
+
+                      <div className="w-32 shrink-0">
+                        <label className="text-[9px] uppercase tracking-wider text-[#8C7A6B] font-semibold block mb-1">
+                          Swatch Color
+                        </label>
+                        <div className="flex items-center gap-2 bg-[#EDE5DC]/40 border border-[#2C2621]/20 rounded-lg px-2 py-1">
+                          <input
+                            type="color"
+                            value={newColorHex}
+                            onChange={(e) => setNewColorHex(e.target.value)}
+                            className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent p-0"
+                            title="Pick swatch color"
+                          />
+                          <span className="text-[10px] font-mono text-[#5C4D3C] uppercase truncate">
+                            {newColorHex}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="sm:self-end">
+                        <button
+                          type="button"
+                          onClick={handleAddColorVariant}
+                          className="w-full sm:w-auto px-4 py-2 bg-[#1E1B18] hover:bg-[#8C6D46] text-[#FAF7F2] rounded-lg text-[10px] tracking-wider uppercase font-semibold transition-all flex items-center justify-center gap-1 shadow-xs"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>Add Color</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* List of Added Colorways */}
+                  {formData.colorVariants.length > 0 && (
+                    <div className="space-y-3">
+                      {formData.colorVariants.map((cv, vIdx) => (
+                        <div
+                          key={cv.name + vIdx}
+                          className="bg-white rounded-xl p-3 border border-[#2C2621]/15 shadow-xs"
+                        >
+                          <div className="flex items-center justify-between pb-2 border-b border-[#2C2621]/10">
+                            <div className="flex items-center gap-2">
+                              {cv.hex && (
+                                <span
+                                  className="w-4 h-4 rounded-full border border-black/20 shrink-0"
+                                  style={{ backgroundColor: cv.hex }}
+                                />
+                              )}
+                              <span className="font-serif text-xs uppercase font-semibold text-[#1E1B18]">
+                                {cv.name}
+                              </span>
+                              <span className="text-[9px] text-[#8C7A6B]">
+                                ({cv.images.length} photo{cv.images.length === 1 ? "" : "s"})
+                              </span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveColorVariant(vIdx)}
+                              className="text-[#8C7A6B] hover:text-[#992222] text-[10px] uppercase tracking-wider font-semibold flex items-center gap-1"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>Remove</span>
+                            </button>
+                          </div>
+
+                          {/* Upload Photos for this Colorway */}
+                          <div className="mt-2.5">
+                            <span className="text-[9px] uppercase tracking-wider text-[#8C7A6B] block mb-1.5 font-medium">
+                              Photos for {cv.name}:
+                            </span>
+
+                            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                              {/* Hidden file input */}
+                              <label className="relative shrink-0 w-16 h-20 rounded-lg border-2 border-dashed border-[#2C2621]/20 hover:border-[#1E1B18] bg-[#EDE5DC]/40 flex flex-col items-center justify-center cursor-pointer transition-all">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  multiple
+                                  onChange={(e) => handleVariantImageUpload(vIdx, e)}
+                                  className="hidden"
+                                />
+                                <Camera className="w-4 h-4 text-[#8C7A6B] mb-0.5" />
+                                <span className="text-[7.5px] uppercase tracking-wider font-semibold text-[#5C4D3C] text-center px-1">
+                                  {variantUploadingIdx === vIdx ? "..." : "+ Photo"}
+                                </span>
+                              </label>
+
+                              {cv.images.map((imgUrl, imgIdx) => (
+                                <div
+                                  key={imgUrl + imgIdx}
+                                  className="relative shrink-0 w-16 h-20 rounded-lg overflow-hidden border border-[#2C2621]/15 group"
+                                >
+                                  <Image
+                                    src={imgUrl}
+                                    alt={`${cv.name} photo ${imgIdx + 1}`}
+                                    fill
+                                    className="object-cover"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveVariantImage(vIdx, imgUrl)}
+                                    className="absolute top-1 right-1 w-4 h-4 rounded-full bg-[#992222] text-white text-[8px] flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity font-bold"
+                                    title="Remove photo"
+                                  >
+                                    ✕
+                                  </button>
+                                  {imgIdx === 0 && (
+                                    <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[6.5px] uppercase text-center font-bold py-0.5">
+                                      Lead
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* SECTION 3: THEME & CATEGORY */}
@@ -1366,6 +1885,33 @@ export default function AdminPage() {
                       ) : null}
 
                       <p className="text-[10px] text-[#736555] line-clamp-1 mt-0.5">Sizes: {p.sizes.join(", ")}</p>
+
+                      {p.colorVariants && p.colorVariants.length > 0 && (
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          <span className="text-[8px] uppercase tracking-wider text-[#8C7A6B] font-semibold">
+                            Colorways ({p.colorVariants.length}):
+                          </span>
+                          {p.colorVariants.map((cv) => (
+                            <span
+                              key={cv.name}
+                              className="inline-flex items-center gap-1 text-[8px] uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-[#EDE5DC] border border-[#2C2621]/10 text-[#1E1B18]"
+                            >
+                              {cv.hex && (
+                                <span
+                                  className="w-2 h-2 rounded-full border border-black/20 shrink-0"
+                                  style={{ backgroundColor: cv.hex }}
+                                />
+                              )}
+                              <span>{cv.name}</span>
+                              {cv.images && cv.images.length > 0 && (
+                                <span className="text-[7.5px] text-[#8C6D46] font-medium">
+                                  ({cv.images.length})
+                                </span>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1397,6 +1943,8 @@ export default function AdminPage() {
             </div>
           )}
         </div>
+        </>
+      )}
       </main>
     </div>
   );

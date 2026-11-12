@@ -1,4 +1,4 @@
-import { Product } from "@/data/products";
+import { Product, ColorVariant, Order, OrderItem } from "@/data/products";
 
 const SUPABASE_URL = (
   process.env.SUPABASE_URL ||
@@ -39,6 +39,19 @@ function mapDbToProduct(row: Record<string, unknown>): Product {
     : typeof row.images === "string"
     ? JSON.parse(row.images)
     : [];
+
+  let colorVariants: ColorVariant[] | undefined;
+  const rawCV = row.color_variants ?? row.colorVariants;
+  if (rawCV) {
+    try {
+      const parsed = typeof rawCV === "string" ? JSON.parse(rawCV) : rawCV;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        colorVariants = parsed as ColorVariant[];
+      }
+    } catch {
+      // ignore malformed color_variants
+    }
+  }
 
   const rawDesc = (row.description as string) || "";
   const description =
@@ -81,6 +94,7 @@ function mapDbToProduct(row: Record<string, unknown>): Product {
     inStock: row.in_stock !== undefined ? Boolean(row.in_stock) : true,
     quantity: row.quantity !== undefined && row.quantity !== null ? Number(row.quantity) : undefined,
     isHeroFeatured: Boolean(row.is_hero_featured),
+    colorVariants,
   };
 }
 
@@ -108,6 +122,11 @@ function mapProductToDb(p: Product): Record<string, unknown> {
   // Only include quantity if explicitly present
   if (p.quantity !== undefined) {
     record.quantity = p.quantity;
+  }
+
+  // Only include color_variants if explicitly present
+  if (p.colorVariants && p.colorVariants.length > 0) {
+    record.color_variants = p.colorVariants;
   }
 
   return record;
@@ -161,6 +180,18 @@ export async function insertProductToSupabase(product: Product): Promise<boolean
       if (errText.includes("quantity")) {
         const fallbackPayload = { ...payload };
         delete fallbackPayload.quantity;
+        delete fallbackPayload.color_variants;
+        res = await fetch(`${SUPABASE_URL}/rest/v1/products`, {
+          method: "POST",
+          headers: {
+            ...getHeaders(),
+            Prefer: "return=minimal",
+          },
+          body: JSON.stringify(fallbackPayload),
+        });
+      } else if (errText.includes("color_variants")) {
+        const fallbackPayload = { ...payload };
+        delete fallbackPayload.color_variants;
         res = await fetch(`${SUPABASE_URL}/rest/v1/products`, {
           method: "POST",
           headers: {
@@ -172,6 +203,23 @@ export async function insertProductToSupabase(product: Product): Promise<boolean
       } else {
         console.error("Supabase insert error:", res.status, errText);
         return false;
+      }
+    }
+
+    // If color_variants column doesn't exist, retry without it
+    if (!res.ok && payload.color_variants !== undefined) {
+      const errText2 = await res.text();
+      if (errText2.includes("color_variants")) {
+        const fallbackPayload = { ...payload };
+        delete fallbackPayload.color_variants;
+        res = await fetch(`${SUPABASE_URL}/rest/v1/products`, {
+          method: "POST",
+          headers: {
+            ...getHeaders(),
+            Prefer: "return=minimal",
+          },
+          body: JSON.stringify(fallbackPayload),
+        });
       }
     }
 
@@ -211,6 +259,7 @@ export async function updateProductInSupabase(
     if (product.inStock !== undefined) updatePayload.in_stock = product.inStock;
     if (product.quantity !== undefined) updatePayload.quantity = product.quantity;
     if (product.isHeroFeatured !== undefined) updatePayload.is_hero_featured = product.isHeroFeatured;
+    if (product.colorVariants !== undefined) updatePayload.color_variants = product.colorVariants;
 
     let res = await fetch(
       `${SUPABASE_URL}/rest/v1/products?id=eq.${encodeURIComponent(id)}`,
@@ -229,6 +278,26 @@ export async function updateProductInSupabase(
       const errText = await res.text();
       if (errText.includes("quantity")) {
         delete updatePayload.quantity;
+        delete updatePayload.color_variants;
+        res = await fetch(
+          `${SUPABASE_URL}/rest/v1/products?id=eq.${encodeURIComponent(id)}`,
+          {
+            method: "PATCH",
+            headers: {
+              ...getHeaders(),
+              Prefer: "return=minimal",
+            },
+            body: JSON.stringify(updatePayload),
+          }
+        );
+      }
+    }
+
+    // If color_variants column doesn't exist, retry without it
+    if (!res.ok && updatePayload.color_variants !== undefined) {
+      const errText2 = await res.text();
+      if (errText2.includes("color_variants")) {
+        delete updatePayload.color_variants;
         res = await fetch(
           `${SUPABASE_URL}/rest/v1/products?id=eq.${encodeURIComponent(id)}`,
           {
@@ -272,8 +341,13 @@ export async function uploadImageToSupabaseStorage(
   fileBuffer: Buffer | ArrayBuffer,
   filename: string,
   contentType: string
-): Promise<string | null> {
-  if (!SERVICE_KEY) return null;
+): Promise<{ url: string | null; error?: string }> {
+  if (!SERVICE_KEY) {
+    return {
+      url: null,
+      error: "Supabase service key is not configured in environment variables",
+    };
+  }
 
   try {
     const bucket = "product-images";
@@ -291,16 +365,138 @@ export async function uploadImageToSupabaseStorage(
     });
 
     if (res.ok) {
-      // Public URL format
-      return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${encodeURIComponent(filename)}`;
+      return {
+        url: `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${encodeURIComponent(filename)}`,
+      };
     } else {
       const err = await res.text();
-      console.warn("Supabase storage upload failed, falling back to local:", res.status, err);
-      return null;
+      console.error("Supabase storage upload error:", res.status, err);
+      return {
+        url: null,
+        error: `Supabase Storage error (${res.status}): ${err}`,
+      };
     }
   } catch (error) {
     console.error("Supabase storage exception:", error);
-    return null;
+    return {
+      url: null,
+      error: error instanceof Error ? error.message : "Unknown upload error",
+    };
+  }
+}
+
+// ── ORDERS PERSISTENCE IN SUPABASE ──────────────────────────────────────
+
+function mapDbToOrder(row: Record<string, unknown>): Order {
+  const items = Array.isArray(row.items)
+    ? (row.items as OrderItem[])
+    : typeof row.items === "string"
+    ? JSON.parse(row.items)
+    : [];
+
+  return {
+    id: String(row.id),
+    orderNumber: (row.order_number as string) || "",
+    items,
+    subtotal: Number(row.subtotal) || 0,
+    discount: Number(row.discount) || 0,
+    shipping: Number(row.shipping) || 0,
+    total: Number(row.total) || 0,
+    promoCode: (row.promo_code as string) || undefined,
+    status: (row.status as Order["status"]) || "confirmed",
+    customerNote: (row.customer_note as string) || undefined,
+    createdAt: (row.created_at as string) || new Date().toISOString(),
+  };
+}
+
+export async function fetchOrdersFromSupabase(): Promise<Order[]> {
+  if (!SERVICE_KEY) return [];
+
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/orders?select=*&order=created_at.desc`,
+      {
+        headers: getHeaders(),
+        cache: "no-store",
+      }
+    );
+
+    if (!res.ok) {
+      console.warn("Supabase orders fetch returned status:", res.status);
+      return [];
+    }
+
+    const rows = await res.json();
+    if (Array.isArray(rows)) {
+      return rows.map(mapDbToOrder);
+    }
+    return [];
+  } catch (error) {
+    console.error("Failed to query Supabase orders:", error);
+    return [];
+  }
+}
+
+export async function insertOrderToSupabase(order: Order): Promise<boolean> {
+  if (!SERVICE_KEY) return false;
+
+  try {
+    const payload = {
+      id: order.id,
+      order_number: order.orderNumber,
+      items: order.items,
+      subtotal: order.subtotal,
+      discount: order.discount,
+      shipping: order.shipping,
+      total: order.total,
+      promo_code: order.promoCode || null,
+      status: order.status,
+      customer_note: order.customerNote || null,
+    };
+
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/orders`, {
+      method: "POST",
+      headers: {
+        ...getHeaders(),
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.error("Supabase order insert error:", res.status, err);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error("Supabase order insert exception:", error);
+    return false;
+  }
+}
+
+export async function updateOrderStatusInSupabase(
+  id: string,
+  status: Order["status"]
+): Promise<boolean> {
+  if (!SERVICE_KEY) return false;
+
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/orders?id=eq.${encodeURIComponent(id)}`,
+      {
+        method: "PATCH",
+        headers: {
+          ...getHeaders(),
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({ status }),
+      }
+    );
+    return res.ok;
+  } catch (error) {
+    console.error("Supabase order update error:", error);
+    return false;
   }
 }
 

@@ -10,9 +10,13 @@ interface CartDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   cart: CartItem[];
-  onUpdateQuantity: (productId: string, size: string, delta: number) => void;
-  onRemoveItem: (productId: string, size: string) => void;
+  onUpdateQuantity: (productId: string, size: string, delta: number, color?: string) => void;
+  onRemoveItem: (productId: string, size: string, color?: string) => void;
   onClearCart?: () => void;
+}
+
+function createFallbackOrderNumber(): string {
+  return `RA-${Date.now().toString().slice(-6)}`;
 }
 
 export default function CartDrawer({
@@ -27,6 +31,7 @@ export default function CartDrawer({
   const [discountApplied, setDiscountApplied] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
+  const [confirmedOrderNumber, setConfirmedOrderNumber] = useState("");
 
   if (!isOpen) return null;
 
@@ -59,13 +64,56 @@ export default function CartDrawer({
     }
   };
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     setIsCheckingOut(true);
-    setTimeout(() => {
+    try {
+      const orderPayload = {
+        items: cart.map((item) => {
+          const cv = item.selectedColor
+            ? item.product.colorVariants?.find((c) => c.name === item.selectedColor)
+            : null;
+          const displayImg =
+            cv && cv.images && cv.images.length > 0
+              ? cv.images[0]
+              : item.product.image;
+
+          return {
+            productId: item.product.id,
+            productName: item.product.name,
+            productImage: displayImg,
+            selectedSize: item.selectedSize,
+            selectedColor: item.selectedColor,
+            price: item.product.price,
+            quantity: item.quantity,
+          };
+        }),
+        subtotal,
+        discount: discountAmount,
+        shipping,
+        total,
+        promoCode: discountApplied ? promoCode : undefined,
+      };
+
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderPayload),
+      });
+
+      if (res.ok) {
+        const order = await res.json();
+        setConfirmedOrderNumber(order.orderNumber);
+      } else {
+        setConfirmedOrderNumber(createFallbackOrderNumber());
+      }
+    } catch (err) {
+      console.error("Order error:", err);
+      setConfirmedOrderNumber(createFallbackOrderNumber());
+    } finally {
       setIsCheckingOut(false);
       setOrderComplete(true);
       onClearCart?.();
-    }, 1500);
+    }
   };
 
   return (
@@ -136,8 +184,13 @@ export default function CartDrawer({
                   GRAZIE! ORDER CONFIRMED
                 </h3>
                 <p className="text-xs text-[#736555] tracking-wide mt-2 max-w-xs leading-relaxed">
-                  Your acquisition is being prepared with archival tissue and Florence atelier seals. Order #RA-89240.
+                  Your acquisition is being prepared with archival tissue and Florence atelier seals.
                 </p>
+                {confirmedOrderNumber && (
+                  <div className="mt-3 px-3 py-1.5 rounded-full bg-[#EDE5DC] border border-[#2C2621]/15 text-xs font-semibold text-[#1E1B18] tracking-widest uppercase">
+                    Order #{confirmedOrderNumber}
+                  </div>
+                )}
                 <button
                   onClick={() => {
                     setOrderComplete(false);
@@ -164,85 +217,110 @@ export default function CartDrawer({
                 </button>
               </div>
             ) : (
-              cart.map((item) => (
-                <div
-                  key={`${item.product.id}-${item.selectedSize}`}
-                  className="flex gap-4 p-3 bg-white rounded-xl border border-[#2C2621]/10 shadow-xs"
-                >
-                  <div className="relative w-20 h-24 rounded-lg overflow-hidden bg-[#EDE5DC] shrink-0 border border-[#2C2621]/10">
-                    <Image
-                      src={item.product.image}
-                      alt={item.product.name}
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
+              cart.map((item) => {
+                // Determine item display image (color-variant-specific if available)
+                const cv = item.selectedColor
+                  ? item.product.colorVariants?.find((c) => c.name === item.selectedColor)
+                  : null;
+                const displayImage =
+                  cv && cv.images && cv.images.length > 0
+                    ? cv.images[0]
+                    : item.product.image;
 
-                  <div className="flex flex-col justify-between flex-1">
-                    <div>
-                      <div className="flex justify-between items-start">
-                        <h4 className="font-serif text-sm uppercase font-semibold text-[#1E1B18] leading-tight">
-                          {item.product.name}
-                        </h4>
-                        <button
-                          onClick={() =>
-                            onRemoveItem(item.product.id, item.selectedSize)
-                          }
-                          className="text-[#8C7A6B] hover:text-[#992222] p-1 transition-colors"
-                          title="Remove item"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                const itemKey = `${item.product.id}-${item.selectedSize}-${item.selectedColor || "default"}`;
 
-                      <div className="text-[10px] tracking-wider uppercase text-[#8C7A6B] mt-1">
-                        Size: <span className="font-medium text-[#1E1B18]">{item.selectedSize}</span>
-                      </div>
-
-                      <div className="font-serif text-sm font-medium text-[#1E1B18] mt-1">
-                        {formatNaira(item.product.price)}
-                      </div>
+                return (
+                  <div
+                    key={itemKey}
+                    className="flex gap-4 p-3 bg-white rounded-xl border border-[#2C2621]/10 shadow-xs"
+                  >
+                    <div className="relative w-20 h-24 rounded-lg overflow-hidden bg-[#EDE5DC] shrink-0 border border-[#2C2621]/10">
+                      <Image
+                        src={displayImage}
+                        alt={item.product.name}
+                        fill
+                        className="object-cover"
+                      />
                     </div>
 
-                    {/* Quantity controls */}
-                    <div className="flex items-center justify-between pt-2 border-t border-[#2C2621]/5">
-                      <div className="flex items-center border border-[#2C2621]/20 rounded-full bg-[#FAF7F2]">
-                        <button
-                          onClick={() =>
-                            onUpdateQuantity(
-                              item.product.id,
-                              item.selectedSize,
-                              -1
-                            )
-                          }
-                          className="p-1 hover:text-[#8C6D46] transition-colors"
-                        >
-                          <Minus className="w-3 h-3" />
-                        </button>
-                        <span className="px-2.5 text-xs font-medium font-sans">
-                          {item.quantity}
+                    <div className="flex flex-col justify-between flex-1">
+                      <div>
+                        <div className="flex justify-between items-start">
+                          <h4 className="font-serif text-sm uppercase font-semibold text-[#1E1B18] leading-tight">
+                            {item.product.name}
+                          </h4>
+                          <button
+                            onClick={() =>
+                              onRemoveItem(item.product.id, item.selectedSize, item.selectedColor)
+                            }
+                            className="text-[#8C7A6B] hover:text-[#992222] p-1 transition-colors"
+                            title="Remove item"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        <div className="text-[10px] tracking-wider uppercase text-[#8C7A6B] mt-1 flex items-center gap-1.5 flex-wrap">
+                          <span>
+                            Size: <span className="font-semibold text-[#1E1B18]">{item.selectedSize}</span>
+                          </span>
+                          {item.selectedColor && (
+                            <>
+                              <span>•</span>
+                              <span>
+                                Color: <span className="font-semibold text-[#8C6D46]">{item.selectedColor}</span>
+                              </span>
+                            </>
+                          )}
+                        </div>
+
+                        <div className="font-serif text-sm font-medium text-[#1E1B18] mt-1">
+                          {formatNaira(item.product.price)}
+                        </div>
+                      </div>
+
+                      {/* Quantity controls */}
+                      <div className="flex items-center justify-between pt-2 border-t border-[#2C2621]/5">
+                        <div className="flex items-center border border-[#2C2621]/20 rounded-full bg-[#FAF7F2]">
+                          <button
+                            onClick={() =>
+                              onUpdateQuantity(
+                                item.product.id,
+                                item.selectedSize,
+                                -1,
+                                item.selectedColor
+                              )
+                            }
+                            className="p-1 hover:text-[#8C6D46] transition-colors"
+                          >
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="px-2.5 text-xs font-medium font-sans">
+                            {item.quantity}
+                          </span>
+                          <button
+                            onClick={() =>
+                              onUpdateQuantity(
+                                item.product.id,
+                                item.selectedSize,
+                                1,
+                                item.selectedColor
+                              )
+                            }
+                            className="p-1 hover:text-[#8C6D46] transition-colors"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+
+                        <span className="text-xs font-serif font-semibold text-[#1E1B18]">
+                          {formatNaira(item.product.price * item.quantity)}
                         </span>
-                        <button
-                          onClick={() =>
-                            onUpdateQuantity(
-                              item.product.id,
-                              item.selectedSize,
-                              1
-                            )
-                          }
-                          className="p-1 hover:text-[#8C6D46] transition-colors"
-                        >
-                          <Plus className="w-3 h-3" />
-                        </button>
                       </div>
-
-                      <span className="text-xs font-serif font-semibold text-[#1E1B18]">
-                        {formatNaira(item.product.price * item.quantity)}
-                      </span>
                     </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 
@@ -300,7 +378,7 @@ export default function CartDrawer({
                 className="w-full py-3 bg-[#1E1B18] hover:bg-[#2C2621] text-[#FAF7F2] rounded-full text-xs tracking-[0.25em] uppercase font-medium transition-all shadow-md flex items-center justify-center gap-2 mt-2"
               >
                 {isCheckingOut ? (
-                  <span className="animate-pulse">CONNECTING TO SECURE CHECKOUT...</span>
+                  <span className="animate-pulse">CONFIRMING ATELIER ACQUISITION...</span>
                 ) : (
                   <>
                     <span>PROCEED TO SECURE CHECKOUT</span>
@@ -320,4 +398,3 @@ export default function CartDrawer({
     </div>
   );
 }
-

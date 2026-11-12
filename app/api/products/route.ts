@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { getStoredProducts, saveStoredProducts } from "@/lib/productsStorage";
 import {
   fetchProductsFromSupabase,
   insertProductToSupabase,
@@ -8,32 +7,28 @@ import {
 } from "@/lib/supabase";
 import { Product } from "@/data/products";
 
-// GET /api/products
+// GET /api/products — 100% from Supabase database
 export async function GET() {
   try {
-    // 1. Try reading live from Supabase
     const supabaseProducts = await fetchProductsFromSupabase();
     if (supabaseProducts !== null) {
-      // Sync to local file as backup cache
-      saveStoredProducts(supabaseProducts);
       return NextResponse.json(supabaseProducts);
     }
+    return NextResponse.json([]);
   } catch (err) {
-    console.warn("Supabase fetch fallback to local:", err);
+    console.error("Supabase fetch error:", err);
+    return NextResponse.json(
+      { error: "Failed to load products from database" },
+      { status: 500 }
+    );
   }
-
-  // 2. Fallback to local stored products
-  const products = getStoredProducts();
-  return NextResponse.json(products);
 }
 
-// POST /api/products (Create new product)
+// POST /api/products (Create new product in Supabase)
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const products = getStoredProducts();
 
-    // Auto-generate ID if not provided
     const id =
       body.id ||
       body.name
@@ -71,26 +66,30 @@ export async function POST(request: Request) {
       inStock: body.inStock !== undefined ? Boolean(body.inStock) : true,
       quantity: body.quantity !== undefined ? (Number(body.quantity) || 0) : undefined,
       isHeroFeatured: Boolean(body.isHeroFeatured),
+      colorVariants: Array.isArray(body.colorVariants) && body.colorVariants.length > 0
+        ? body.colorVariants
+        : undefined,
     };
 
-    // Save to Supabase (in background/async)
-    await insertProductToSupabase(newProduct);
-
-    // Also update local cache
-    const updated = [newProduct, ...products];
-    saveStoredProducts(updated);
+    const success = await insertProductToSupabase(newProduct);
+    if (!success) {
+      return NextResponse.json(
+        { error: "Failed to insert product into Supabase" },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json(newProduct, { status: 201 });
   } catch (error) {
     console.error("Failed to create product:", error);
     return NextResponse.json(
-      { error: "Failed to create product" },
+      { error: "Failed to create product in database" },
       { status: 500 }
     );
   }
 }
 
-// PUT /api/products (Update existing product)
+// PUT /api/products (Update existing product in Supabase)
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
@@ -98,50 +97,39 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Product id is required" }, { status: 400 });
     }
 
-    const products = getStoredProducts();
-    const index = products.findIndex((p) => p.id === body.id);
-
-    const updatedProduct: Product = {
-      ...(index !== -1 ? products[index] : {}),
+    const updatedProduct: Partial<Product> = {
       ...body,
       price:
         body.price !== undefined
           ? typeof body.price === "number"
             ? body.price
             : Number(body.price) || 0
-          : index !== -1
-          ? products[index].price
-          : 0,
+          : undefined,
       quantity:
         body.quantity !== undefined
           ? Number(body.quantity) || 0
-          : index !== -1
-          ? products[index].quantity
           : undefined,
     };
 
-    // Update in Supabase
-    await updateProductInSupabase(body.id, updatedProduct);
-
-    // Update local cache
-    if (index !== -1) {
-      products[index] = updatedProduct;
-      saveStoredProducts(products);
-    } else {
-      saveStoredProducts([updatedProduct, ...products]);
+    const success = await updateProductInSupabase(body.id, updatedProduct);
+    if (!success) {
+      return NextResponse.json(
+        { error: "Failed to update product in Supabase" },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json(updatedProduct);
   } catch (error) {
     console.error("Failed to update product:", error);
     return NextResponse.json(
-      { error: "Failed to update product" },
+      { error: "Failed to update product in database" },
       { status: 500 }
     );
   }
 }
 
-// PATCH /api/products (Quick toggle inStock or partial update)
+// PATCH /api/products (Quick toggle inStock or partial update in Supabase)
 export async function PATCH(request: Request) {
   try {
     const body = await request.json();
@@ -149,29 +137,25 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Product id is required" }, { status: 400 });
     }
 
-    // Update in Supabase
-    await updateProductInSupabase(body.id, body);
-
-    const products = getStoredProducts();
-    const index = products.findIndex((p) => p.id === body.id);
-
-    if (index !== -1) {
-      products[index] = {
-        ...products[index],
-        ...body,
-      };
-      saveStoredProducts(products);
-      return NextResponse.json(products[index]);
+    const success = await updateProductInSupabase(body.id, body);
+    if (!success) {
+      return NextResponse.json(
+        { error: "Failed to update product in Supabase" },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json(body);
   } catch (error) {
     console.error("Failed to patch product:", error);
-    return NextResponse.json({ error: "Failed to update product" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to update product in database" },
+      { status: 500 }
+    );
   }
 }
 
-// DELETE /api/products (Delete product by ID)
+// DELETE /api/products (Delete product by ID from Supabase)
 export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -181,18 +165,19 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Product id is required" }, { status: 400 });
     }
 
-    // Delete in Supabase
-    await deleteProductFromSupabase(id);
-
-    const products = getStoredProducts();
-    const filtered = products.filter((p) => p.id !== id);
-    saveStoredProducts(filtered);
+    const success = await deleteProductFromSupabase(id);
+    if (!success) {
+      return NextResponse.json(
+        { error: "Failed to delete product from Supabase" },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ success: true, removedId: id });
   } catch (error) {
     console.error("Failed to delete product:", error);
     return NextResponse.json(
-      { error: "Failed to delete product" },
+      { error: "Failed to delete product from database" },
       { status: 500 }
     );
   }

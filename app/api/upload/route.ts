@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
 import path from "path";
 import { uploadImageToSupabaseStorage } from "@/lib/supabase";
 
@@ -24,42 +23,35 @@ export async function POST(request: Request) {
     const filename = `${cleanBase || "piece"}-${Date.now()}${ext}`;
     const contentType = file.type || "image/jpeg";
 
-    // 1. Try uploading to Supabase Storage bucket 'product-images'
-    const supabaseUrl = await uploadImageToSupabaseStorage(
+    // Direct upload to Supabase Storage bucket 'product-images'
+    const result = await uploadImageToSupabaseStorage(
       buffer,
       filename,
       contentType
     );
 
-    if (supabaseUrl) {
+    if (result.url) {
       return NextResponse.json({
         success: true,
-        url: supabaseUrl,
+        url: result.url,
         filename,
         storage: "supabase",
       });
     }
 
-    // 2. Fallback to local storage in public/uploads/
-    const uploadDir = path.join(process.cwd(), "public", "uploads");
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-
-    const filePath = path.join(uploadDir, filename);
-    fs.writeFileSync(filePath, buffer);
-
-    const publicUrl = `/uploads/${filename}`;
-    return NextResponse.json({
-      success: true,
-      url: publicUrl,
-      filename,
-      storage: "local",
-    });
-  } catch (error) {
-    console.error("Upload error:", error);
+    console.error("Supabase Storage upload failed:", result.error);
     return NextResponse.json(
-      { error: "Failed to upload file from device" },
+      {
+        error:
+          result.error ||
+          "Failed to upload to Supabase Storage. Please ensure the 'product-images' bucket exists and is public in Supabase.",
+      },
+      { status: 500 }
+    );
+  } catch (error) {
+    console.error("Upload handler exception:", error);
+    return NextResponse.json(
+      { error: "Failed to process image upload." },
       { status: 500 }
     );
   }

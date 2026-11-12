@@ -8,7 +8,7 @@ import { formatNaira } from "@/lib/currency";
 
 interface ProductShowcaseProps {
   products: Product[];
-  onAddToCart: (product: Product, size: string) => void;
+  onAddToCart: (product: Product, size: string, color?: string) => void;
   onOpenQuickView: (product: Product) => void;
   onToggleWishlist: (product: Product) => void;
   wishlistIds: string[];
@@ -39,7 +39,8 @@ export default function ProductShowcase({
     e?.stopPropagation();
     if (!product.inStock) return;
     const size = selectedSizes[product.id] || product.sizes[0] || "Standard";
-    onAddToCart(product, size);
+    const color = product.colorVariants?.[0]?.name;
+    onAddToCart(product, size, color);
     setAddedId(product.id);
     setTimeout(() => setAddedId(null), 1800);
   };
@@ -189,9 +190,16 @@ export default function ProductShowcase({
                       </button>
                     </div>
 
-                    {/* Category Pill Tag */}
-                    <div className="absolute bottom-2 left-2 bg-[#1E1B18]/70 text-[#FAF7F2] text-[8px] tracking-[0.16em] uppercase px-2 py-0.5 rounded">
-                      {product.category}
+                    {/* Category Pill Tag & Color Count Tag */}
+                    <div className="absolute bottom-2 left-2 flex items-center gap-1">
+                      <div className="bg-[#1E1B18]/70 text-[#FAF7F2] text-[8px] tracking-[0.16em] uppercase px-2 py-0.5 rounded">
+                        {product.category}
+                      </div>
+                      {product.colorVariants && product.colorVariants.length > 0 && (
+                        <div className="bg-[#8C6D46]/90 text-[#FAF7F2] text-[8px] tracking-[0.1em] uppercase px-1.5 py-0.5 rounded font-medium">
+                          {product.colorVariants.length} Colors
+                        </div>
+                      )}
                     </div>
                   </div>
 

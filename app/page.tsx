@@ -86,32 +86,46 @@ export default function Home() {
   };
 
   // Cart operations
-  const handleAddToCart = (product: Product, size: string) => {
+  const handleAddToCart = (product: Product, size: string, color?: string) => {
     setCart((prev) => {
       const existing = prev.find(
-        (item) => item.product.id === product.id && item.selectedSize === size
+        (item) =>
+          item.product.id === product.id &&
+          item.selectedSize === size &&
+          (item.selectedColor || "") === (color || "")
       );
       if (existing) {
         return prev.map((item) =>
-          item.product.id === product.id && item.selectedSize === size
+          item.product.id === product.id &&
+          item.selectedSize === size &&
+          (item.selectedColor || "") === (color || "")
             ? { ...item, quantity: item.quantity + 1 }
             : item
         );
       }
-      return [...prev, { product, selectedSize: size, quantity: 1 }];
+      return [
+        ...prev,
+        { product, selectedSize: size, selectedColor: color, quantity: 1 },
+      ];
     });
-    showToast(`Added ${product.name} (${size}) to your bag`);
+    const label = color ? `${product.name} (${size} · ${color})` : `${product.name} (${size})`;
+    showToast(`Added ${label} to your bag`);
   };
 
   const handleUpdateQuantity = (
     productId: string,
     size: string,
-    delta: number
+    delta: number,
+    color?: string
   ) => {
     setCart((prev) =>
       prev
         .map((item) => {
-          if (item.product.id === productId && item.selectedSize === size) {
+          if (
+            item.product.id === productId &&
+            item.selectedSize === size &&
+            (item.selectedColor || "") === (color || "")
+          ) {
             const newQty = item.quantity + delta;
             return newQty > 0 ? { ...item, quantity: newQty } : null;
           }
@@ -121,11 +135,15 @@ export default function Home() {
     );
   };
 
-  const handleRemoveFromCart = (productId: string, size: string) => {
+  const handleRemoveFromCart = (productId: string, size: string, color?: string) => {
     setCart((prev) =>
       prev.filter(
         (item) =>
-          !(item.product.id === productId && item.selectedSize === size)
+          !(
+            item.product.id === productId &&
+            item.selectedSize === size &&
+            (item.selectedColor || "") === (color || "")
+          )
       )
     );
     showToast("Item removed from bag");

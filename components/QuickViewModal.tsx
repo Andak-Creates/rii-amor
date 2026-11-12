@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { X, ShoppingBag, Heart, Check } from "lucide-react";
 import { Product } from "@/data/products";
@@ -9,7 +9,7 @@ import { formatNaira } from "@/lib/currency";
 interface QuickViewModalProps {
   product: Product | null;
   onClose: () => void;
-  onAddToCart: (product: Product, size: string) => void;
+  onAddToCart: (product: Product, size: string, color?: string) => void;
   onToggleWishlist: (product: Product) => void;
   isWishlisted: boolean;
 }
@@ -22,23 +22,56 @@ export default function QuickViewModal({
   isWishlisted,
 }: QuickViewModalProps) {
   const [selectedSize, setSelectedSize] = useState<string>("");
+  const [selectedColor, setSelectedColor] = useState<string>("");
   const [activeImageIdx, setActiveImageIdx] = useState<number>(0);
   const [added, setAdded] = useState(false);
 
+  // Initialize defaults whenever product changes
+  useEffect(() => {
+    if (product) {
+      setSelectedSize(product.sizes?.[0] || "Standard");
+      if (product.colorVariants && product.colorVariants.length > 0) {
+        setSelectedColor(product.colorVariants[0].name);
+      } else {
+        setSelectedColor("");
+      }
+      setActiveImageIdx(0);
+    }
+  }, [product]);
+
   if (!product) return null;
 
-  // Build gallery: use product.images[] if available, else fall back to primary + secondary
-  const gallery: string[] =
+  // Selected color variant object
+  const activeColorVariant = product.colorVariants?.find(
+    (cv) => cv.name === selectedColor
+  );
+
+  // Build gallery:
+  // If a color variant is selected and has images, use those!
+  // Otherwise use product.images or [product.image, product.secondaryImage]
+  const variantImages =
+    activeColorVariant && activeColorVariant.images && activeColorVariant.images.length > 0
+      ? activeColorVariant.images
+      : null;
+
+  const defaultGallery: string[] =
     product.images && product.images.length > 0
       ? product.images
       : [product.image, product.secondaryImage].filter(
           (u, i, arr) => u && arr.indexOf(u) === i,
         ) as string[];
 
+  const gallery: string[] = variantImages || defaultGallery;
+
   const currentSize = selectedSize || product.sizes[0] || "Standard";
 
+  const handleColorSelect = (colorName: string) => {
+    setSelectedColor(colorName);
+    setActiveImageIdx(0);
+  };
+
   const handleAdd = () => {
-    onAddToCart(product, currentSize);
+    onAddToCart(product, currentSize, selectedColor || undefined);
     setAdded(true);
     setTimeout(() => {
       setAdded(false);
@@ -82,6 +115,13 @@ export default function QuickViewModal({
                 {product.numberLabel}
               </div>
             ) : null}
+
+            {/* Colorway Badge if variant selected */}
+            {selectedColor && (
+              <div className="absolute bottom-2.5 left-2.5 bg-[#1E1B18]/85 text-[#FAF7F2] text-[8px] sm:text-[9px] tracking-[0.16em] uppercase px-2.5 py-1 rounded-full font-medium backdrop-blur-xs">
+                Color: {selectedColor}
+              </div>
+            )}
           </div>
 
           {/* Thumbnail switcher — dynamic gallery strip */}
@@ -159,6 +199,50 @@ export default function QuickViewModal({
               ) : null}
             </div>
 
+            {/* COLORWAYS SELECTOR — Dynamic when product has color variants */}
+            {product.colorVariants && product.colorVariants.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between text-[10px] tracking-wider uppercase text-[#8C7A6B] mb-1.5">
+                  <span className="font-semibold">
+                    SELECT COLORWAY:{" "}
+                    <span className="text-[#1E1B18] font-bold">
+                      {selectedColor || "Select"}
+                    </span>
+                  </span>
+                  <span className="text-[9px] text-[#8C7A6B]">
+                    {product.colorVariants.length} option{product.colorVariants.length > 1 ? "s" : ""}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {product.colorVariants.map((cv) => {
+                    const isSelected = selectedColor === cv.name;
+                    return (
+                      <button
+                        type="button"
+                        key={cv.name}
+                        onClick={() => handleColorSelect(cv.name)}
+                        className={`px-3 py-1.5 rounded-xl text-[10px] sm:text-xs font-medium uppercase border transition-all flex items-center gap-2 ${
+                          isSelected
+                            ? "bg-[#1E1B18] text-[#FAF7F2] border-[#1E1B18] shadow-xs ring-1 ring-[#1E1B18]"
+                            : "bg-[#EDE5DC]/60 text-[#2C2621] border-[#2C2621]/15 hover:border-[#1E1B18]"
+                        }`}
+                      >
+                        {cv.hex && (
+                          <span
+                            className="w-3.5 h-3.5 rounded-full border border-black/20 shrink-0"
+                            style={{ backgroundColor: cv.hex }}
+                          />
+                        )}
+                        <span>{cv.name}</span>
+                        {isSelected && <Check className="w-3 h-3 text-[#C99742]" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Composition badge - only if admin provided composition */}
             {product.composition && product.composition.trim() ? (
               <div className="p-2.5 sm:p-3 bg-[#EDE5DC]/70 rounded-xl border border-[#2C2621]/10 text-xs">
@@ -175,7 +259,7 @@ export default function QuickViewModal({
             {product.sizes && product.sizes.length > 0 && (
               <div>
                 <div className="flex items-center justify-between text-[10px] tracking-wider uppercase text-[#8C7A6B] mb-1.5">
-                  <span>SELECT SIZE</span>
+                  <span className="font-semibold">SELECT SIZE</span>
                 </div>
 
                 <div className="flex flex-wrap gap-1.5 sm:gap-2">
@@ -239,7 +323,9 @@ export default function QuickViewModal({
                 ) : (
                   <>
                     <ShoppingBag className="w-4 h-4" />
-                    <span>ADD TO CART • {formatNaira(product.price)}</span>
+                    <span>
+                      ADD TO CART • {formatNaira(product.price)}
+                    </span>
                   </>
                 )}
               </button>
